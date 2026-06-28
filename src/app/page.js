@@ -332,23 +332,14 @@ function LeaderboardView({ currentUser, matches, results }) {
   const myData = board.find((b) => b.username === currentUser);
   const isAdmin = currentUser && currentUser.toLowerCase() === "tortas";
 
-  // Calculate correct predictions for selected user
-  const correctPredictions = [];
+  // Calculate predictions for selected user
+  const userPredictions = [];
   if (selectedUser && selectedUserVotes && matches && results) {
     matches.forEach((m) => {
-      const vote = selectedUserVotes[String(m.id)];
-      const result = results[String(m.id)];
-      if (vote && result) {
-        const pts = scoreVote(vote, result);
-        if (pts > 0) {
-          correctPredictions.push({
-            match: m,
-            vote,
-            result,
-            points: pts,
-          });
-        }
-      }
+      const vote = selectedUserVotes[String(m.id)] || null;
+      const result = results[String(m.id)] || null;
+      const pts = vote && result ? scoreVote(vote, result) : null;
+      userPredictions.push({ match: m, vote, result, points: pts });
     });
   }
 
@@ -443,12 +434,12 @@ function LeaderboardView({ currentUser, matches, results }) {
         )}
       </div>
 
-      {/* Modal for displaying correct predictions of selected user */}
+      {/* Modal for displaying all predictions of selected user */}
       {selectedUser && (
         <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div className="modal-title">⚽ Aciertos de {selectedUser}</div>
+              <div className="modal-title">⚽ Pronósticos de {selectedUser}</div>
               <button className="modal-close-btn" onClick={handleCloseModal}>&times;</button>
             </div>
             <div className="modal-body">
@@ -468,18 +459,25 @@ function LeaderboardView({ currentUser, matches, results }) {
                     fontSize: "0.85rem",
                     color: "var(--text-secondary)"
                   }}>
-                    <span>Aciertos: <strong>{correctPredictions.length}</strong></span>
-                    <span>Puntos totales: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
+                    <span>Pronosticados: <strong>{userPredictions.filter(p => p.vote).length}/{matches.length}</strong></span>
+                    <span>Puntos: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {correctPredictions.map(({ match, vote, result, points }) => (
-                      <div key={match.id} className={`prediction-item pts-${points}`}>
+                    {userPredictions.map(({ match, vote, result, points }) => (
+                      <div key={match.id} className={`prediction-item ${points !== null ? `pts-${points}` : ""}`}>
                         <div className="prediction-match-info">
                           <span style={{ textTransform: "capitalize", fontWeight: 600 }}>{match.stage || "16avos"}</span>
-                          <span className={`points-badge pts-${points}`} style={{ margin: 0, padding: "2px 8px" }}>
-                            {points === 2 ? "🎯 +2 puntos" : "✓ +1 punto"}
-                          </span>
+                          {points !== null && points > 0 && (
+                            <span className={`points-badge pts-${points}`} style={{ margin: 0, padding: "2px 8px" }}>
+                              {points === 2 ? "🎯 +2 puntos" : "✓ +1 punto"}
+                            </span>
+                          )}
+                          {points === 0 && (
+                            <span className="points-badge pts-0" style={{ margin: 0, padding: "2px 8px" }}>
+                              ❌ +0 puntos
+                            </span>
+                          )}
                         </div>
                         <div className="prediction-teams">
                           <span>{match.teamA.flag} {match.teamA.name}</span>
@@ -496,17 +494,11 @@ function LeaderboardView({ currentUser, matches, results }) {
                           marginTop: "2px",
                           color: "var(--text-secondary)"
                         }}>
-                          <span>Resultado real: <strong>{result.goalsA} - {result.goalsB}</strong></span>
-                          <span>Su pronóstico: <strong>{vote.goalsA} - {vote.goalsB}</strong></span>
+                          <span>Resultado real: <strong>{result ? `${result.goalsA} - ${result.goalsB}` : "—"}</strong></span>
+                          <span>Su pronóstico: <strong>{vote ? `${vote.goalsA} - ${vote.goalsB}` : "Sin pronóstico"}</strong></span>
                         </div>
                       </div>
                     ))}
-
-                    {correctPredictions.length === 0 && (
-                      <div style={{ textAlign: "center", padding: "30px", color: "var(--text-muted)" }}>
-                        📭 Este usuario aún no tiene ningún acierto registrado.
-                      </div>
-                    )}
                   </div>
                 </>
               )}
