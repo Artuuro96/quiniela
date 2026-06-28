@@ -85,6 +85,19 @@ export async function addMatch(m) {
   if (error) throw new Error(error.message);
 }
 
+export async function deleteMatch(matchId) {
+  checkSupabase();
+  const { error } = await supabase.from('quiniela_matches').delete().eq('id', matchId);
+  if (error) throw new Error(error.message);
+}
+
+export async function getCountries() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('quiniela_countries').select('*').order('name', { ascending: true });
+  if (error || !data || data.length === 0) return [];
+  return data;
+}
+
 // --- Usuarios ---
 export async function getUsers() {
   if (!supabase) return [];

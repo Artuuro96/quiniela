@@ -25,7 +25,10 @@ import {
   clearCustomMatches,
   updateMatch,
   addMatch,
+  deleteMatch,
+  getCountries,
 } from "@/lib/storage";
+import { COUNTRIES } from "@/data/countries";
 import { supabase } from "@/lib/supabase";
 
 // ─── Helpers ───
@@ -75,6 +78,8 @@ function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
+  const isAdminRoute = typeof window !== "undefined" && window.location.search.includes("admin");
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -82,7 +87,7 @@ function LoginScreen({ onLogin }) {
     if (!u) { setError("Por favor introduce tu nombre"); return; }
     if (u.length < 3) { setError("El nombre debe tener al menos 3 letras"); return; }
 
-    if (isRegister) {
+    if (isRegister && !isAdminRoute) {
       const res = await registerUser(u);
       if (!res.ok) { setError(res.error); return; }
       const login = await loginUser(u);
@@ -106,7 +111,7 @@ function LoginScreen({ onLogin }) {
             id="input-username"
             className="form-input"
             type="text"
-            placeholder="Tu nombre completo o apodo"
+            placeholder={isAdminRoute ? "Nombre del administrador (tortas)" : "Tu nombre completo o apodo"}
             value={username}
             onChange={(e) => setUsername(e.target.value.toLowerCase())}
             autoComplete="name"
@@ -114,14 +119,16 @@ function LoginScreen({ onLogin }) {
         </div>
         <div className="form-error">{error}</div>
         <button id="btn-login" className="btn-primary" type="submit" style={{ marginTop: "8px" }}>
-          {isRegister ? "Crear cuenta" : "Entrar a la Quiniela"}
+          {isRegister && !isAdminRoute ? "Crear cuenta" : "Entrar a la Quiniela"}
         </button>
-        <div className="login-toggle" style={{ marginTop: "16px", textAlign: "center", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-          {isRegister ? "¿Ya tienes cuenta? " : "¿Eres nuevo? "}
-          <button type="button" onClick={() => { setIsRegister(!isRegister); setError(""); }} style={{ background: "none", border: "none", color: "var(--accent-cyan)", cursor: "pointer", fontWeight: 600, padding: 0 }}>
-            {isRegister ? "Inicia sesión" : "Regístrate aquí"}
-          </button>
-        </div>
+        {!isAdminRoute && (
+          <div className="login-toggle" style={{ marginTop: "16px", textAlign: "center", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+            {isRegister ? "¿Ya tienes cuenta? " : "¿Eres nuevo? "}
+            <button type="button" onClick={() => { setIsRegister(!isRegister); setError(""); }} style={{ background: "none", border: "none", color: "var(--accent-cyan)", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+              {isRegister ? "Inicia sesión" : "Regístrate aquí"}
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );
