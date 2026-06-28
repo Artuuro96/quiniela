@@ -74,7 +74,7 @@ export default function CapitanPage() {
 
   const handleReset = async () => {
     if (confirm("¿Estás seguro de que quieres restablecer los partidos predeterminados?")) {
-      await clearCustomMatches();
+      await saveCustomMatches(MATCHES);
       setMatchesCount(MATCHES.length);
       setError("");
       setSuccess("¡Partidos restablecidos a los predeterminados!");

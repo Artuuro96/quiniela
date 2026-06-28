@@ -445,7 +445,7 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
 
   const handleReset = async () => {
     if (window.confirm("¿Estás seguro de que quieres restablecer los partidos predeterminados?")) {
-      await clearCustomMatches();
+      await saveCustomMatches(MATCHES);
       onMatchesUpdated(MATCHES);
       setError("");
       setSuccess("¡Partidos restablecidos a los predeterminados!");
