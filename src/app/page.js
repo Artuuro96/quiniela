@@ -105,7 +105,7 @@ function LoginScreen({ onLogin }) {
             type="text"
             placeholder="Tu nombre completo o apodo"
             value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            onChange={(e) => setUsername(e.target.value.toLowerCase())}
             autoComplete="name"
           />
         </div>
