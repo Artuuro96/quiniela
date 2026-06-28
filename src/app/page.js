@@ -654,61 +654,26 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
     }
   };
 
-  const handleFileUpload = (e) => {
-    setError("");
-    setSuccess("");
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target.result;
-        validateAndSave(text);
-      } catch (err) {
-        setError("Error al leer el archivo: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const validateAndSave = async (text) => {
-    try {
-      const parsed = JSON.parse(text);
-      if (!Array.isArray(parsed)) {
-        throw new Error("El JSON debe ser un arreglo de partidos.");
-      }
-
-      parsed.forEach((m, idx) => {
-        if (!m.id) throw new Error(`El partido en posición ${idx + 1} no tiene "id".`);
-        if (!m.teamA || !m.teamA.name || !m.teamA.flag || !m.teamA.code) {
-          throw new Error(`El partido en posición ${idx + 1} no tiene "teamA" con name, flag y code.`);
-        }
-        if (!m.teamB || !m.teamB.name || !m.teamB.flag || !m.teamB.code) {
-          throw new Error(`El partido en posición ${idx + 1} no tiene "teamB" con name, flag y code.`);
-        }
-        if (!m.date) {
-          throw new Error(`El partido en posición ${idx + 1} no tiene "date".`);
-        }
-        if (!m.venue) {
-          throw new Error(`El partido en posición ${idx + 1} no tiene "venue".`);
-        }
-      });
-
-      await saveCustomMatches(parsed);
-      onMatchesUpdated(parsed);
-      setSuccess("¡Partidos cargados correctamente!");
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
   const handleReset = async () => {
     if (window.confirm("¿Estás seguro de que quieres restablecer los partidos predeterminados?")) {
       await saveCustomMatches(MATCHES);
       onMatchesUpdated(MATCHES);
       setError("");
       setSuccess("¡Partidos restablecidos a los predeterminados!");
+    }
+  };
+
+  const handleDeleteMatch = async (matchId) => {
+    if (window.confirm("¿Estás seguro de que deseas eliminar este partido? Esta acción no se puede deshacer.")) {
+      try {
+        await deleteMatch(matchId);
+        const newList = matches.filter(m => m.id !== matchId);
+        onMatchesUpdated(newList);
+        setSuccess("¡Partido eliminado!");
+        setTimeout(() => setSuccess(""), 3000);
+      } catch (err) {
+        setError("Error al eliminar partido: " + err.message);
+      }
     }
   };
 
@@ -759,37 +724,13 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
       </div>
 
       <div className="login-card" style={{ maxWidth: "100%", margin: "0 auto 24px", padding: "16px" }}>
-        <h3 style={{ fontSize: "1rem", marginBottom: "8px", textAlign: "left" }}>Cargar Partidos (JSON)</h3>
+        <h3 style={{ fontSize: "1rem", marginBottom: "12px", textAlign: "left", color: "var(--accent-cyan)" }}>➕ Añadir Partido de Siguiente Fase</h3>
         <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: 16, textAlign: "left", lineHeight: "1.4" }}>
-          Sube un archivo JSON con los partidos. Opcionalmente usa el campo <code>"stage"</code> para la fase ("16avos", "8avos", "4tos", "semis", "final").
+          Configura y añade un partido para las fases eliminatorias seleccionando países de la lista.
         </p>
-
-        <div className="form-group">
-          <label className="form-label" style={{ textAlign: "center", cursor: "pointer", display: "block", border: "2px dashed var(--border-glass)", padding: "16px", borderRadius: "var(--radius-md)", transition: "var(--transition-fast)" }}>
-            <span style={{ fontSize: "1.5rem", display: "block", marginBottom: 4 }}>📁</span>
-            <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>Seleccionar archivo JSON</span>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleFileUpload}
-              style={{ display: "none" }}
-            />
-          </label>
-        </div>
 
         {error && <div className="form-error" style={{ marginBottom: 12, color: "var(--accent-red)" }}>❌ {error}</div>}
         {success && <div className="vote-saved-msg" style={{ marginBottom: 12, color: "var(--accent-green)" }}>✅ {success}</div>}
-
-        <button className="btn-logout" onClick={handleReset} style={{ width: "100%", borderColor: "var(--accent-red)", color: "var(--accent-red)", padding: "10px", marginTop: 8 }}>
-          Restablecer partidos predeterminados
-        </button>
-      </div>
-
-      <div className="login-card" style={{ maxWidth: "100%", margin: "0 auto 24px", padding: "16px" }}>
-        <h3 style={{ fontSize: "1rem", marginBottom: "12px", textAlign: "left", color: "var(--accent-cyan)" }}>➕ Añadir Partido de Siguiente Fase</h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: 16, textAlign: "left", lineHeight: "1.4" }}>
-          Configura y añade un partido para las fases eliminatorias (Octavos, Cuartos, Semifinales, Final, etc.).
-        </p>
 
         <form onSubmit={handleCreateMatch} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
           <div className="form-group">
@@ -818,51 +759,51 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
             <div style={{ border: "1px solid rgba(255,255,255,0.05)", padding: "8px", borderRadius: "var(--radius-sm)" }}>
               <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent-cyan)", display: "block", marginBottom: "6px" }}>Equipo A</span>
-              <input
-                type="text"
-                placeholder="Nombre (ej: Brasil)"
-                value={newTeamAName}
-                onChange={(e) => setNewTeamAName(e.target.value)}
-                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
-              />
-              <input
-                type="text"
-                placeholder="Código (ej: BRA)"
+              <select
                 value={newTeamACode}
-                onChange={(e) => setNewTeamACode(e.target.value)}
-                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
-              />
-              <input
-                type="text"
-                placeholder="Bandera Emoji (ej: 🇧🇷)"
-                value={newTeamAFlag}
-                onChange={(e) => setNewTeamAFlag(e.target.value)}
-                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
-              />
+                onChange={(e) => {
+                  const code = e.target.value;
+                  setNewTeamACode(code);
+                  const country = COUNTRIES.find(c => c.code === code);
+                  if (country) {
+                    setNewTeamAName(country.name);
+                    setNewTeamAFlag(country.flag);
+                  } else {
+                    setNewTeamAName("");
+                    setNewTeamAFlag("🏳️");
+                  }
+                }}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem" }}
+              >
+                <option value="">-- Seleccionar país --</option>
+                {COUNTRIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                ))}
+              </select>
             </div>
             <div style={{ border: "1px solid rgba(255,255,255,0.05)", padding: "8px", borderRadius: "var(--radius-sm)" }}>
               <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent-cyan)", display: "block", marginBottom: "6px" }}>Equipo B</span>
-              <input
-                type="text"
-                placeholder="Nombre (ej: Francia)"
-                value={newTeamBName}
-                onChange={(e) => setNewTeamBName(e.target.value)}
-                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
-              />
-              <input
-                type="text"
-                placeholder="Código (ej: FRA)"
+              <select
                 value={newTeamBCode}
-                onChange={(e) => setNewTeamBCode(e.target.value)}
-                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
-              />
-              <input
-                type="text"
-                placeholder="Bandera Emoji (ej: 🇫🇷)"
-                value={newTeamBFlag}
-                onChange={(e) => setNewTeamBFlag(e.target.value)}
-                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
-              />
+                onChange={(e) => {
+                  const code = e.target.value;
+                  setNewTeamBCode(code);
+                  const country = COUNTRIES.find(c => c.code === code);
+                  if (country) {
+                    setNewTeamBName(country.name);
+                    setNewTeamBFlag(country.flag);
+                  } else {
+                    setNewTeamBName("");
+                    setNewTeamBFlag("🏳️");
+                  }
+                }}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem" }}
+              >
+                <option value="">-- Seleccionar país --</option>
+                {COUNTRIES.map(c => (
+                  <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -905,6 +846,10 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
 
           <button type="submit" className="btn-primary" style={{ marginTop: "8px", padding: "12px", border: "none", borderRadius: "var(--radius-md)", fontWeight: 700, cursor: "pointer" }}>
             ➕ Añadir Partido a la Base de Datos
+          </button>
+
+          <button type="button" className="btn-logout" onClick={handleReset} style={{ width: "100%", borderColor: "var(--accent-red)", color: "var(--accent-red)", padding: "10px" }}>
+            Restablecer partidos predeterminados
           </button>
         </form>
       </div>
@@ -1067,13 +1012,22 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
                 </div>
               </div>
 
-              <button
-                className="btn-save-vote"
-                style={{ background: "var(--accent-violet)", width: "100%", maxWidth: "none", margin: 0 }}
-                onClick={() => handleUpdateMatch(m.id, m)}
-              >
-                💾 Guardar Datos del Partido
-              </button>
+              <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                <button
+                  className="btn-save-vote"
+                  style={{ background: "var(--accent-violet)", width: "100%", maxWidth: "none", margin: 0, flex: 1 }}
+                  onClick={() => handleUpdateMatch(m.id, m)}
+                >
+                  💾 Guardar Datos del Partido
+                </button>
+                <button
+                  className="btn-logout"
+                  onClick={() => handleDeleteMatch(m.id)}
+                  style={{ borderColor: "var(--accent-red)", color: "var(--accent-red)", flex: 1 }}
+                >
+                  🗑️ Eliminar Partido
+                </button>
+              </div>
             </div>
           </div>
         ))}

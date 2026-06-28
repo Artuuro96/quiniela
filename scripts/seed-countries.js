@@ -2,7 +2,6 @@ const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
 const path = require('path');
 
-// Load environment variables manually
 function getEnv() {
   const envPath = path.join(__dirname, '../.env.local');
   if (!fs.existsSync(envPath)) {
@@ -14,9 +13,7 @@ function getEnv() {
   content.split('\n').forEach(line => {
     const parts = line.split('=');
     if (parts.length >= 2) {
-      const key = parts[0].trim();
-      const val = parts.slice(1).join('=').trim();
-      env[key] = val;
+      env[parts[0].trim()] = parts.slice(1).join('=').trim();
     }
   });
   return env;
@@ -33,58 +30,66 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// List of matches from MATCHES
-const MATCHES = [
-  { teamA: { name: "Sudáfrica", flag: "🇿🇦", code: "RSA" }, teamB: { name: "Canadá", flag: "🇨🇦", code: "CAN" } },
-  { teamA: { name: "Brasil", flag: "🇧🇷", code: "BRA" }, teamB: { name: "Japón", flag: "🇯🇵", code: "JPN" } },
-  { teamA: { name: "Alemania", flag: "🇩🇪", code: "GER" }, teamB: { name: "Paraguay", flag: "🇵🇾", code: "PAR" } },
-  { teamA: { name: "Países Bajos", flag: "🇳🇱", code: "NED" }, teamB: { name: "Marruecos", flag: "🇲🇦", code: "MAR" } },
-  { teamA: { name: "C. de Marfil", flag: "🇨🇮", code: "CIV" }, teamB: { name: "Noruega", flag: "🇳🇴", code: "NOR" } },
-  { teamA: { name: "Francia", flag: "🇫🇷", code: "FRA" }, teamB: { name: "Suecia", flag: "🇸🇪", code: "SWE" } },
-  { teamA: { name: "Argentina", flag: "🇦🇷", code: "ARG" }, teamB: { name: "Australia", flag: "🇦🇺", code: "AUS" } },
-  { teamA: { name: "España", flag: "🇪🇸", code: "ESP" }, teamB: { name: "Camerún", flag: "🇨🇲", code: "CMR" } },
-  { teamA: { name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", code: "ENG" }, teamB: { name: "Ecuador", flag: "🇪🇨", code: "ECU" } },
-  { teamA: { name: "Portugal", flag: "🇵🇹", code: "POR" }, teamB: { name: "Corea del Sur", flag: "🇰🇷", code: "KOR" } },
-  { teamA: { name: "Italia", flag: "🇮🇹", code: "ITA" }, teamB: { name: "Egipto", flag: "🇪🇬", code: "EGY" } },
-  { teamA: { name: "Bélgica", flag: "🇧🇪", code: "BEL" }, teamB: { name: "Senegal", flag: "🇸🇳", code: "SEN" } },
-  { teamA: { name: "Uruguay", flag: "🇺🇾", code: "URU" }, teamB: { name: "Irán", flag: "🇮🇷", code: "IRN" } },
-  { teamA: { name: "Croacia", flag: "🇭🇷", code: "CRO" }, teamB: { name: "Argelia", flag: "🇩🇿", code: "ALG" } },
-  { teamA: { name: "Colombia", flag: "🇨🇴", code: "COL" }, teamB: { name: "Túnez", flag: "🇹🇳", code: "TUN" } },
-  { teamA: { name: "México", flag: "🇲🇽", code: "MEX" }, teamB: { name: "EE. UU.", flag: "🇺🇸", code: "USA" } }
+const COUNTRIES = [
+  { name: "Sudáfrica", flag: "🇿🇦", code: "RSA" },
+  { name: "Canadá", flag: "🇨🇦", code: "CAN" },
+  { name: "Brasil", flag: "🇧🇷", code: "BRA" },
+  { name: "Japón", flag: "🇯🇵", code: "JPN" },
+  { name: "Alemania", flag: "🇩🇪", code: "GER" },
+  { name: "Paraguay", flag: "🇵🇾", code: "PAR" },
+  { name: "Países Bajos", flag: "🇳🇱", code: "NED" },
+  { name: "Marruecos", flag: "🇲🇦", code: "MAR" },
+  { name: "C. de Marfil", flag: "🇨🇮", code: "CIV" },
+  { name: "Noruega", flag: "🇳🇴", code: "NOR" },
+  { name: "Francia", flag: "🇫🇷", code: "FRA" },
+  { name: "Suecia", flag: "🇸🇪", code: "SWE" },
+  { name: "Argentina", flag: "🇦🇷", code: "ARG" },
+  { name: "Australia", flag: "🇦🇺", code: "AUS" },
+  { name: "España", flag: "🇪🇸", code: "ESP" },
+  { name: "Camerún", flag: "🇨🇲", code: "CMR" },
+  { name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", code: "ENG" },
+  { name: "Ecuador", flag: "🇪🇨", code: "ECU" },
+  { name: "Portugal", flag: "🇵🇹", code: "POR" },
+  { name: "Corea del Sur", flag: "🇰🇷", code: "KOR" },
+  { name: "Italia", flag: "🇮🇹", code: "ITA" },
+  { name: "Egipto", flag: "🇪🇬", code: "EGY" },
+  { name: "Bélgica", flag: "🇧🇪", code: "BEL" },
+  { name: "Senegal", flag: "🇸🇳", code: "SEN" },
+  { name: "Uruguay", flag: "🇺🇾", code: "URU" },
+  { name: "Irán", flag: "🇮🇷", code: "IRN" },
+  { name: "Croacia", flag: "🇭🇷", code: "CRO" },
+  { name: "Argelia", flag: "🇩🇿", code: "ALG" },
+  { name: "Colombia", flag: "🇨🇴", code: "COL" },
+  { name: "Túnez", flag: "🇹🇳", code: "TUN" },
+  { name: "México", flag: "🇲🇽", code: "MEX" },
+  { name: "EE. UU.", flag: "🇺🇸", code: "USA" }
 ];
 
 async function seed() {
-  const countriesMap = {};
-  MATCHES.forEach(m => {
-    if (m.teamA && m.teamA.code) {
-      countriesMap[m.teamA.code] = { code: m.teamA.code, name: m.teamA.name, flag: m.teamA.flag };
-    }
-    if (m.teamB && m.teamB.code) {
-      countriesMap[m.teamB.code] = { code: m.teamB.code, name: m.teamB.name, flag: m.teamB.flag };
-    }
-  });
+  console.log(`📦 Sembrando ${COUNTRIES.length} países en 'quiniela_countries'...`);
 
-  const countries = Object.values(countriesMap);
-  console.log(`Encontrados ${countries.length} países únicos en los partidos de 16avos.`);
+  const { data, error } = await supabase.from('quiniela_countries').upsert(
+    COUNTRIES,
+    { onConflict: 'code' }
+  );
 
-  console.log("Insertando/Actualizando países en 'quiniela_countries'...");
-  const { data, error } = await supabase.from('quiniela_countries').upsert(countries);
-  
   if (error) {
-    console.error("Error al insertar en Supabase:", error.message);
-    console.log("\n⚠️ Si la tabla no existe, ejecuta esta consulta SQL en el panel de Supabase:");
-    console.log(`
-CREATE TABLE IF NOT EXISTS public.quiniela_countries (
-    code text PRIMARY KEY,
-    name text NOT NULL,
-    flag text NOT NULL
-);
-ALTER TABLE public.quiniela_countries ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Allow public read on countries" ON public.quiniela_countries FOR SELECT USING (true);
-CREATE POLICY "Allow all on countries" ON public.quiniela_countries FOR ALL USING (true) WITH CHECK (true);
-    `);
+    console.error("❌ Error:", error.message);
+    console.log("\n⚠️  La tabla 'quiniela_countries' no existe aún.");
+    console.log("📋 Para crearla, ejecuta este SQL en el SQL Editor de Supabase:\n");
+    console.log("CREATE TABLE IF NOT EXISTS public.quiniela_countries (");
+    console.log("    code text PRIMARY KEY,");
+    console.log("    name text NOT NULL,");
+    console.log("    flag text NOT NULL");
+    console.log(");");
+    console.log("ALTER TABLE public.quiniela_countries ENABLE ROW LEVEL SECURITY;");
+    console.log("CREATE POLICY \"Allow public read on countries\"");
+    console.log("  ON public.quiniela_countries FOR SELECT USING (true);");
+    console.log("CREATE POLICY \"Allow all on countries\"");
+    console.log("  ON public.quiniela_countries FOR ALL USING (true) WITH CHECK (true);");
+    console.log("\nDespués de crear la tabla, ejecuta este script de nuevo con: npm run seed");
   } else {
-    console.log("¡Países sembrados exitosamente en la base de datos!");
+    console.log("✅ ¡Países sembrados exitosamente en la base de datos!");
   }
 }
 
