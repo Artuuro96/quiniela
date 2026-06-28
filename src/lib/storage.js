@@ -1,229 +1,252 @@
-// localStorage helpers for the Quiniela app
+import { supabase } from './supabase';
+
 const KEYS = {
-  USERS: "quiniela_users",
   CURRENT_USER: "quiniela_current_user",
-  VOTES: "quiniela_votes",
-  RESULTS: "quiniela_results",
-  CUSTOM_MATCHES: "quiniela_custom_matches",
 };
 
-export function getCustomMatches() {
-  return get(KEYS.CUSTOM_MATCHES);
+function checkSupabase() {
+  if (!supabase) throw new Error("Supabase no está configurado. Por favor, añade tus credenciales a .env.local");
 }
 
-export function saveCustomMatches(matches) {
-  set(KEYS.CUSTOM_MATCHES, matches);
-}
-
-export function clearCustomMatches() {
-  if (typeof window !== "undefined") {
-    localStorage.removeItem(KEYS.CUSTOM_MATCHES);
+// --- Partidos (Matches) ---
+export async function getCustomMatches() {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('quiniela_matches').select('*').order('id', { ascending: true });
+  if (error) {
+    console.error("Error getCustomMatches:", error);
+    return null;
   }
+  if (!data || data.length === 0) return null;
+  
+  return data.map(d => ({
+    id: d.id,
+    stage: d.stage,
+    date: d.match_date,
+    venue: d.venue,
+    teamA: { name: d.team_a_name, flag: d.team_a_flag, code: d.team_a_code },
+    teamB: { name: d.team_b_name, flag: d.team_b_flag, code: d.team_b_code }
+  }));
 }
 
-export function clearAllData() {
+export async function saveCustomMatches(matches) {
+  checkSupabase();
+  await supabase.from('quiniela_matches').delete().neq('id', -1);
+  const payload = matches.map(m => ({
+    id: m.id,
+    stage: m.stage || '16avos',
+    match_date: m.date,
+    venue: m.venue,
+    team_a_name: m.teamA.name,
+    team_a_flag: m.teamA.flag,
+    team_a_code: m.teamA.code,
+    team_b_name: m.teamB.name,
+    team_b_flag: m.teamB.flag,
+    team_b_code: m.teamB.code,
+  }));
+  const { error } = await supabase.from('quiniela_matches').insert(payload);
+  if (error) throw new Error(error.message);
+}
+
+export async function clearCustomMatches() {
+  checkSupabase();
+  await supabase.from('quiniela_matches').delete().neq('id', -1);
+}
+
+// --- Usuarios ---
+export async function getUsers() {
+  if (!supabase) return [];
+  const { data, error } = await supabase.from('quiniela_users').select('username');
+  if (error) return [];
+  return data;
+}
+
+export async function registerUser(username) {
+  checkSupabase();
+  const { error } = await supabase.from('quiniela_users').insert([{ username: username.toLowerCase() }]);
+  if (error) {
+    return { ok: false, error: "Ese usuario ya existe o hubo un error al registrarlo." };
+  }
+  return { ok: true };
+}
+
+export async function loginUser(username) {
+  checkSupabase();
+  const { data, error } = await supabase.from('quiniela_users')
+    .select('username')
+    .eq('username', username.toLowerCase())
+    .single();
+    
+  if (error || !data) {
+    return { ok: false, error: "Usuario no encontrado. Si eres nuevo, regístrate aquí abajo." };
+  }
   if (typeof window !== "undefined") {
-    localStorage.removeItem(KEYS.USERS);
-    localStorage.removeItem(KEYS.VOTES);
-    localStorage.removeItem(KEYS.RESULTS);
+    localStorage.setItem(KEYS.CURRENT_USER, data.username);
+  }
+  return { ok: true, username: data.username };
+}
+
+export async function deleteUser(username) {
+  checkSupabase();
+  await supabase.from('quiniela_users').delete().eq('username', username.toLowerCase());
+}
+
+export function getCurrentUser() {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(KEYS.CURRENT_USER);
+}
+
+export function logoutUser() {
+  if (typeof window !== "undefined") {
     localStorage.removeItem(KEYS.CURRENT_USER);
   }
 }
 
-export function restoreAllData(data) {
-  if (typeof window !== "undefined") {
-    if (data.users) localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
-    if (data.votes) localStorage.setItem(KEYS.VOTES, JSON.stringify(data.votes));
-    if (data.results) localStorage.setItem(KEYS.RESULTS, JSON.stringify(data.results));
-  }
+// --- Votos ---
+export async function getAllVotes() {
+  if (!supabase) return {};
+  const { data, error } = await supabase.from('quiniela_votes').select('*');
+  if (error) return {};
+  
+  const votesObj = {};
+  data.forEach(v => {
+    if (!votesObj[v.username]) votesObj[v.username] = {};
+    votesObj[v.username][String(v.match_id)] = { goalsA: v.goals_a, goalsB: v.goals_b };
+  });
+  return votesObj;
 }
 
-
-function get(key) {
-  if (typeof window === "undefined") return null;
-  try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : null;
-  } catch {
-    return null;
-  }
+export async function getUserVotes(username) {
+  const all = await getAllVotes();
+  return all[username.toLowerCase()] || {};
 }
 
-function set(key, value) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-// ---- Users ----
-
-export function getUsers() {
-  return get(KEYS.USERS) || [];
-}
-
-export function registerUser(username) {
-  const users = getUsers();
-  if (users.find((u) => u.username.toLowerCase() === username.toLowerCase())) {
-    return { ok: false, error: "Ese usuario ya existe" };
-  }
-  users.push({ username });
-  set(KEYS.USERS, users);
-  return { ok: true };
-}
-
-export function loginUser(username) {
-  const users = getUsers();
-  const user = users.find(
-    (u) => u.username.toLowerCase() === username.toLowerCase()
+export async function setVote(username, matchId, goalsA, goalsB) {
+  checkSupabase();
+  const { error } = await supabase.from('quiniela_votes').upsert(
+    { username: username.toLowerCase(), match_id: matchId, goals_a: goalsA, goals_b: goalsB },
+    { onConflict: 'username, match_id' }
   );
-  if (!user) {
-    return { ok: false, error: "Usuario no encontrado. Si eres nuevo, regístrate." };
+  if (error) console.error("setVote error", error);
+}
+
+export async function removeVote(username, matchId) {
+  checkSupabase();
+  await supabase.from('quiniela_votes').delete().match({ username: username.toLowerCase(), match_id: matchId });
+}
+
+// --- Resultados ---
+export async function getResults() {
+  if (!supabase) return {};
+  const { data, error } = await supabase.from('quiniela_results').select('*');
+  if (error) return {};
+  const res = {};
+  data.forEach(r => {
+    res[String(r.match_id)] = { goalsA: r.goals_a, goalsB: r.goals_b };
+  });
+  return res;
+}
+
+export async function setResult(matchId, goalsA, goalsB) {
+  checkSupabase();
+  await supabase.from('quiniela_results').upsert(
+    { match_id: matchId, goals_a: goalsA, goals_b: goalsB },
+    { onConflict: 'match_id' }
+  );
+}
+
+export async function clearResult(matchId) {
+  checkSupabase();
+  await supabase.from('quiniela_results').delete().eq('match_id', matchId);
+}
+
+export async function clearAllData() {
+  checkSupabase();
+  await supabase.from('quiniela_votes').delete().neq('username', '');
+  await supabase.from('quiniela_results').delete().neq('match_id', -1);
+  await supabase.from('quiniela_users').delete().neq('username', '');
+}
+
+export async function restoreAllData(data) {
+  checkSupabase();
+  await clearAllData();
+  
+  if (data.users && data.users.length > 0) {
+    const userPayload = data.users.map(u => ({ username: u.username.toLowerCase() }));
+    await supabase.from('quiniela_users').insert(userPayload);
   }
-  set(KEYS.CURRENT_USER, user.username);
-  return { ok: true, username: user.username };
-}
 
-export function deleteUser(username) {
-  const users = getUsers();
-  const filteredUsers = users.filter((u) => u.username !== username);
-  set(KEYS.USERS, filteredUsers);
-
-  // Remove their votes too
-  const allVotes = getAllVotes();
-  if (allVotes[username]) {
-    delete allVotes[username];
-    set(KEYS.VOTES, allVotes);
-  }
-}
-
-export function getCurrentUser() {
-  return get(KEYS.CURRENT_USER);
-}
-
-export function logoutUser() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(KEYS.CURRENT_USER);
-}
-
-// ---- Votes ----
-// Vote structure: { goalsA: number, goalsB: number }
-
-export function getAllVotes() {
-  return get(KEYS.VOTES) || {};
-}
-
-export function getUserVotes(username) {
-  const all = getAllVotes();
-  return all[username] || {};
-}
-
-export function setVote(username, matchId, goalsA, goalsB) {
-  const all = getAllVotes();
-  if (!all[username]) all[username] = {};
-  all[username][String(matchId)] = { goalsA, goalsB };
-  set(KEYS.VOTES, all);
-}
-
-export function removeVote(username, matchId) {
-  const all = getAllVotes();
-  if (all[username]) {
-    delete all[username][String(matchId)];
-    set(KEYS.VOTES, all);
-  }
-}
-
-// ---- Results (admin sets these) ----
-// Result structure: { goalsA: number, goalsB: number }
-
-export function getResults() {
-  return get(KEYS.RESULTS) || {};
-}
-
-export function setResult(matchId, goalsA, goalsB) {
-  const results = getResults();
-  results[String(matchId)] = { goalsA, goalsB };
-  set(KEYS.RESULTS, results);
-}
-
-export function clearResult(matchId) {
-  const results = getResults();
-  delete results[String(matchId)];
-  set(KEYS.RESULTS, results);
-}
-
-// ---- Scoring ----
-// 2 pts = exact score, 1 pt = correct outcome (win/draw/loss), 0 = wrong
-
-function getOutcome(goalsA, goalsB) {
-  if (goalsA > goalsB) return "A";
-  if (goalsA < goalsB) return "B";
-  return "draw";
-}
-
-export function scoreVote(vote, result) {
-  if (!vote || !result) return null; // no result yet
-  const voteOutcome = getOutcome(vote.goalsA, vote.goalsB);
-  const resultOutcome = getOutcome(result.goalsA, result.goalsB);
-
-  if (vote.goalsA === result.goalsA && vote.goalsB === result.goalsB) {
-    return 2; // exact score
-  }
-  if (voteOutcome === resultOutcome) {
-    return 1; // correct outcome
-  }
-  return 0; // wrong
-}
-
-export function calculateScores() {
-  const results = getResults();
-  const allVotes = getAllVotes();
-  const scores = {};
-
-  for (const username of Object.keys(allVotes)) {
-    let points = 0;
-    let exact = 0;
-    let outcomes = 0;
-    let wrong = 0;
-    let totalJudged = 0;
-    const userVotes = allVotes[username];
-
-    for (const matchId of Object.keys(userVotes)) {
-      if (results[matchId]) {
-        totalJudged++;
-        const s = scoreVote(userVotes[matchId], results[matchId]);
-        if (s === 2) { points += 2; exact++; }
-        else if (s === 1) { points += 1; outcomes++; }
-        else { wrong++; }
-      }
+  if (data.votes) {
+    const votePayload = [];
+    Object.keys(data.votes).forEach(user => {
+      const uVotes = data.votes[user];
+      Object.keys(uVotes).forEach(mid => {
+        votePayload.push({
+          username: user.toLowerCase(),
+          match_id: parseInt(mid),
+          goals_a: uVotes[mid].goalsA,
+          goals_b: uVotes[mid].goalsB
+        });
+      });
+    });
+    if (votePayload.length > 0) {
+      await supabase.from('quiniela_votes').insert(votePayload);
     }
-
-    scores[username] = {
-      points,
-      exact,
-      outcomes,
-      wrong,
-      totalJudged,
-      voted: Object.keys(userVotes).length,
-    };
   }
 
-  return scores;
+  if (data.results) {
+    const resPayload = [];
+    Object.keys(data.results).forEach(mid => {
+      resPayload.push({
+        match_id: parseInt(mid),
+        goals_a: data.results[mid].goalsA,
+        goals_b: data.results[mid].goalsB
+      });
+    });
+    if (resPayload.length > 0) {
+      await supabase.from('quiniela_results').insert(resPayload);
+    }
+  }
 }
 
-export function getLeaderboard() {
-  const scores = calculateScores();
-  const users = getUsers();
+export function scoreVote(vote, realResult) {
+  if (!vote || !realResult) return null;
+  if (vote.goalsA === realResult.goalsA && vote.goalsB === realResult.goalsB) return 2;
+  const voteDiff = vote.goalsA - vote.goalsB;
+  const realDiff = realResult.goalsA - realResult.goalsB;
+  if (
+    (voteDiff > 0 && realDiff > 0) ||
+    (voteDiff < 0 && realDiff < 0) ||
+    (voteDiff === 0 && realDiff === 0)
+  ) return 1;
+  return 0;
+}
 
-  const board = users.map((u) => ({
-    username: u.username,
-    points: scores[u.username]?.points || 0,
-    exact: scores[u.username]?.exact || 0,
-    outcomes: scores[u.username]?.outcomes || 0,
-    wrong: scores[u.username]?.wrong || 0,
-    voted: scores[u.username]?.voted || 0,
-  }));
+export async function getLeaderboard() {
+  const users = await getUsers();
+  const votes = await getAllVotes();
+  const results = await getResults();
 
-  // Sort by points desc, then by exact scores desc
-  board.sort((a, b) => b.points - a.points || b.exact - a.exact);
+  const board = users.map((u) => {
+    let pts = 0;
+    let exact = 0;
+    let out = 0;
+    const uVotes = votes[u.username] || {};
 
-  return board;
+    Object.keys(results).forEach((matchId) => {
+      const matchVote = uVotes[matchId];
+      if (matchVote) {
+        const s = scoreVote(matchVote, results[matchId]);
+        if (s === 2) { pts += 2; exact++; }
+        else if (s === 1) { pts += 1; out++; }
+      }
+    });
+
+    return { username: u.username, points: pts, exact, outcomes: out };
+  });
+
+  return board.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.exact !== a.exact) return b.exact - a.exact;
+    return b.outcomes - a.outcomes;
+  });
 }

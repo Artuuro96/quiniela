@@ -72,7 +72,7 @@ function LoginScreen({ onLogin }) {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     const u = username.trim();
@@ -80,12 +80,12 @@ function LoginScreen({ onLogin }) {
     if (u.length < 3) { setError("El nombre debe tener al menos 3 letras"); return; }
 
     if (isRegister) {
-      const res = registerUser(u);
+      const res = await registerUser(u);
       if (!res.ok) { setError(res.error); return; }
-      const login = loginUser(u);
+      const login = await loginUser(u);
       if (login.ok) onLogin(login.username);
     } else {
-      const res = loginUser(u);
+      const res = await loginUser(u);
       if (!res.ok) { setError(res.error); return; }
       onLogin(res.username);
     }
@@ -251,7 +251,19 @@ function MatchCard({ match, vote, result, onVote, locked }) {
 
 // ─── Leaderboard ───
 function LeaderboardView({ currentUser }) {
-  const board = getLeaderboard();
+  const [board, setBoard] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const b = await getLeaderboard();
+      setBoard(b || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  if (loading) return <div style={{textAlign: "center", padding: "40px", color: "var(--accent-cyan)"}}>Cargando posiciones...</div>;
   const medals = ["🥇", "🥈", "🥉"];
   const podiumCls = ["first", "second", "third"];
   const top3 = board.slice(0, 3);
@@ -357,16 +369,27 @@ function LeaderboardView({ currentUser }) {
 
 // ─── Admin Panel (activate with ?admin in URL) ───
 function AdminPanel({ matches, onClose, onMatchesUpdated }) {
-  const [results, setLocalResults] = useState(getResults());
-  const [usersList, setUsersList] = useState(getUsers());
+  const [results, setLocalResults] = useState({});
+  const [usersList, setUsersList] = useState([]);
   const [inputs, setInputs] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const handleDeleteUser = (username) => {
+  useEffect(() => {
+    async function loadData() {
+      const res = await getResults();
+      if (res) setLocalResults(res);
+      const usrs = await getUsers();
+      if (usrs) setUsersList(usrs);
+    }
+    loadData();
+  }, []);
+
+  const handleDeleteUser = async (username) => {
     if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${username}"? Esto borrará sus pronósticos también.`)) {
-      deleteUser(username);
-      setUsersList(getUsers());
+      await deleteUser(username);
+      const usrs = await getUsers();
+      setUsersList(usrs || []);
       setSuccess(`Usuario ${username} eliminado.`);
     }
   };
@@ -389,7 +412,7 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
     reader.readAsText(file);
   };
 
-  const validateAndSave = (text) => {
+  const validateAndSave = async (text) => {
     try {
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed)) {
@@ -412,7 +435,7 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
         }
       });
 
-      saveCustomMatches(parsed);
+      await saveCustomMatches(parsed);
       onMatchesUpdated(parsed);
       setSuccess("¡Partidos cargados correctamente!");
     } catch (err) {
@@ -420,9 +443,9 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (window.confirm("¿Estás seguro de que quieres restablecer los partidos predeterminados?")) {
-      clearCustomMatches();
+      await clearCustomMatches();
       onMatchesUpdated(MATCHES);
       setError("");
       setSuccess("¡Partidos restablecidos a los predeterminados!");
@@ -441,23 +464,25 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
     setInputs((prev) => ({ ...prev, [`${matchId}_${team}`]: v }));
   };
 
-  const handleSave = (matchId) => {
+  const handleSave = async (matchId) => {
     const gA = getInput(matchId, "A");
     const gB = getInput(matchId, "B");
-    setResult(matchId, gA, gB);
-    setLocalResults({ ...getResults() });
+    await setResult(matchId, gA, gB);
+    const res = await getResults();
+    setLocalResults(res || {});
   };
 
-  const handleClear = (matchId) => {
-    clearResult(matchId);
-    setLocalResults({ ...getResults() });
+  const handleClear = async (matchId) => {
+    await clearResult(matchId);
+    const res = await getResults();
+    setLocalResults(res || {});
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const data = {
-      users: getUsers(),
-      votes: getAllVotes(),
-      results: getResults(),
+      users: await getUsers(),
+      votes: await getAllVotes(),
+      results: await getResults(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -476,14 +501,14 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const text = event.target.result;
         const data = JSON.parse(text);
         if (!data.users || !data.votes || !data.results) {
           throw new Error("El archivo no tiene el formato de backup válido (faltan users, votes o results).");
         }
-        restoreAllData(data);
+        await restoreAllData(data);
         setSuccess("Backup restaurado correctamente. Recargando...");
         setTimeout(() => window.location.reload(), 1500);
       } catch (err) {
@@ -642,6 +667,7 @@ export default function Home() {
   const [user, setUser] = useState(null);
   const [tab, setTab] = useState("matches");
   const [votes, setVotes] = useState({});
+  const [results, setResults] = useState({});
   const [toast, setToast] = useState(null);
   const [showAdmin, setShowAdmin] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -650,15 +676,24 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    const saved = getCurrentUser();
-    if (saved) {
-      setUser(saved);
-      setVotes(getUserVotes(saved));
+    
+    async function loadInitialData() {
+      const saved = getCurrentUser();
+      if (saved) {
+        setUser(saved);
+        const uVotes = await getUserVotes(saved);
+        setVotes(uVotes);
+      }
+      const custom = await getCustomMatches();
+      if (custom && Array.isArray(custom)) {
+        setMatchesList(custom);
+      }
+      const res = await getResults();
+      if (res) setResults(res);
     }
-    const custom = getCustomMatches();
-    if (custom && Array.isArray(custom)) {
-      setMatchesList(custom);
-    }
+    
+    loadInitialData();
+
     if (typeof window !== "undefined" && window.location.search.includes("admin")) {
       setShowAdmin(true);
     }
@@ -669,9 +704,12 @@ export default function Home() {
     setTimeout(() => setToast(null), 2500);
   }, []);
 
-  const handleLogin = (username) => {
+  const handleLogin = async (username) => {
     setUser(username);
-    setVotes(getUserVotes(username));
+    const uVotes = await getUserVotes(username);
+    setVotes(uVotes);
+    const res = await getResults();
+    if (res) setResults(res);
     showToast(`¡Bienvenido, ${username}! ⚽`);
   };
 
@@ -682,21 +720,20 @@ export default function Home() {
     setTab("matches");
   };
 
-  const handleVote = (matchId, goalsA, goalsB) => {
+  const handleVote = async (matchId, goalsA, goalsB) => {
     const match = matchesList.find((m) => m.id === matchId);
     if (!match || isLocked(match.date)) {
       showToast("⏰ El partido ya comenzó, no puedes votar", "error");
       return;
     }
-    setVote(user, matchId, goalsA, goalsB);
-    setVotes({ ...getUserVotes(user) });
+    await setVote(user, matchId, goalsA, goalsB);
+    const uVotes = await getUserVotes(user);
+    setVotes(uVotes);
     showToast("✅ Pronóstico guardado");
   };
 
   if (!mounted) return null;
   if (!user) return <LoginScreen onLogin={handleLogin} />;
-
-  const results = getResults();
 
   // Calculate current user stats
   let totalPoints = 0;
