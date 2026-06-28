@@ -21,6 +21,23 @@ export function clearCustomMatches() {
   }
 }
 
+export function clearAllData() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(KEYS.USERS);
+    localStorage.removeItem(KEYS.VOTES);
+    localStorage.removeItem(KEYS.RESULTS);
+    localStorage.removeItem(KEYS.CURRENT_USER);
+  }
+}
+
+export function restoreAllData(data) {
+  if (typeof window !== "undefined") {
+    if (data.users) localStorage.setItem(KEYS.USERS, JSON.stringify(data.users));
+    if (data.votes) localStorage.setItem(KEYS.VOTES, JSON.stringify(data.votes));
+    if (data.results) localStorage.setItem(KEYS.RESULTS, JSON.stringify(data.results));
+  }
+}
+
 
 function get(key) {
   if (typeof window === "undefined") return null;
@@ -59,14 +76,23 @@ export function loginUser(username) {
     (u) => u.username.toLowerCase() === username.toLowerCase()
   );
   if (!user) {
-    // Automatically register if not exists
-    users.push({ username });
-    set(KEYS.USERS, users);
-    set(KEYS.CURRENT_USER, username);
-    return { ok: true, username };
+    return { ok: false, error: "Usuario no encontrado. Si eres nuevo, regístrate." };
   }
   set(KEYS.CURRENT_USER, user.username);
   return { ok: true, username: user.username };
+}
+
+export function deleteUser(username) {
+  const users = getUsers();
+  const filteredUsers = users.filter((u) => u.username !== username);
+  set(KEYS.USERS, filteredUsers);
+
+  // Remove their votes too
+  const allVotes = getAllVotes();
+  if (allVotes[username]) {
+    delete allVotes[username];
+    set(KEYS.VOTES, allVotes);
+  }
 }
 
 export function getCurrentUser() {

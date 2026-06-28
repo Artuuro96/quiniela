@@ -4,9 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import { MATCHES } from "@/data/matches";
 import {
   getCurrentUser,
+  getUsers,
+  deleteUser,
   loginUser,
   registerUser,
   logoutUser,
+  getAllVotes,
   getUserVotes,
   setVote,
   removeVote,
@@ -15,6 +18,8 @@ import {
   clearResult,
   getLeaderboard,
   scoreVote,
+  clearAllData,
+  restoreAllData,
   getCustomMatches,
   saveCustomMatches,
   clearCustomMatches,
@@ -63,6 +68,7 @@ function Toast({ msg }) {
 
 // ─── Login Screen ───
 function LoginScreen({ onLogin }) {
+  const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
 
@@ -73,9 +79,16 @@ function LoginScreen({ onLogin }) {
     if (!u) { setError("Por favor introduce tu nombre"); return; }
     if (u.length < 3) { setError("El nombre debe tener al menos 3 letras"); return; }
 
-    const res = loginUser(u);
-    if (!res.ok) { setError(res.error); return; }
-    onLogin(res.username);
+    if (isRegister) {
+      const res = registerUser(u);
+      if (!res.ok) { setError(res.error); return; }
+      const login = loginUser(u);
+      if (login.ok) onLogin(login.username);
+    } else {
+      const res = loginUser(u);
+      if (!res.ok) { setError(res.error); return; }
+      onLogin(res.username);
+    }
   };
 
   return (
@@ -98,8 +111,14 @@ function LoginScreen({ onLogin }) {
         </div>
         <div className="form-error">{error}</div>
         <button id="btn-login" className="btn-primary" type="submit" style={{ marginTop: "8px" }}>
-          Entrar a la Quiniela
+          {isRegister ? "Crear cuenta" : "Entrar a la Quiniela"}
         </button>
+        <div className="login-toggle" style={{ marginTop: "16px", textAlign: "center", fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+          {isRegister ? "¿Ya tienes cuenta? " : "¿Eres nuevo? "}
+          <button type="button" onClick={() => { setIsRegister(!isRegister); setError(""); }} style={{ background: "none", border: "none", color: "var(--accent-cyan)", cursor: "pointer", fontWeight: 600, padding: 0 }}>
+            {isRegister ? "Inicia sesión" : "Regístrate aquí"}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -162,7 +181,7 @@ function MatchCard({ match, vote, result, onVote, locked }) {
   return (
     <div className={`match-card${vote ? " has-vote" : ""}${locked ? " locked" : ""}`}>
       <div className="match-header">
-        <span className="match-round">Dieciseisavos</span>
+        <span className="match-round" style={{ textTransform: "capitalize" }}>{match.stage || "16avos"}</span>
         <span className={`match-status ${status}`}>{statusLabel[status]}</span>
       </div>
 
@@ -337,9 +356,78 @@ function LeaderboardView({ currentUser }) {
 }
 
 // ─── Admin Panel (activate with ?admin in URL) ───
-function AdminPanel({ matches, onClose }) {
+function AdminPanel({ matches, onClose, onMatchesUpdated }) {
   const [results, setLocalResults] = useState(getResults());
+  const [usersList, setUsersList] = useState(getUsers());
   const [inputs, setInputs] = useState({});
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleDeleteUser = (username) => {
+    if (window.confirm(`¿Estás seguro de que deseas eliminar al usuario "${username}"? Esto borrará sus pronósticos también.`)) {
+      deleteUser(username);
+      setUsersList(getUsers());
+      setSuccess(`Usuario ${username} eliminado.`);
+    }
+  };
+
+  const handleFileUpload = (e) => {
+    setError("");
+    setSuccess("");
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        validateAndSave(text);
+      } catch (err) {
+        setError("Error al leer el archivo: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const validateAndSave = (text) => {
+    try {
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        throw new Error("El JSON debe ser un arreglo de partidos.");
+      }
+
+      parsed.forEach((m, idx) => {
+        if (!m.id) throw new Error(`El partido en posición ${idx + 1} no tiene "id".`);
+        if (!m.teamA || !m.teamA.name || !m.teamA.flag || !m.teamA.code) {
+          throw new Error(`El partido en posición ${idx + 1} no tiene "teamA" con name, flag y code.`);
+        }
+        if (!m.teamB || !m.teamB.name || !m.teamB.flag || !m.teamB.code) {
+          throw new Error(`El partido en posición ${idx + 1} no tiene "teamB" con name, flag y code.`);
+        }
+        if (!m.date) {
+          throw new Error(`El partido en posición ${idx + 1} no tiene "date".`);
+        }
+        if (!m.venue) {
+          throw new Error(`El partido en posición ${idx + 1} no tiene "venue".`);
+        }
+      });
+
+      saveCustomMatches(parsed);
+      onMatchesUpdated(parsed);
+      setSuccess("¡Partidos cargados correctamente!");
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleReset = () => {
+    if (window.confirm("¿Estás seguro de que quieres restablecer los partidos predeterminados?")) {
+      clearCustomMatches();
+      onMatchesUpdated(MATCHES);
+      setError("");
+      setSuccess("¡Partidos restablecidos a los predeterminados!");
+    }
+  };
 
   const getInput = (matchId, team) => {
     const key = `${matchId}_${team}`;
@@ -365,15 +453,134 @@ function AdminPanel({ matches, onClose }) {
     setLocalResults({ ...getResults() });
   };
 
+  const handleExport = () => {
+    const data = {
+      users: getUsers(),
+      votes: getAllVotes(),
+      results: getResults(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "quiniela_data.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const handleBackupUpload = (e) => {
+    setError("");
+    setSuccess("");
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target.result;
+        const data = JSON.parse(text);
+        if (!data.users || !data.votes || !data.results) {
+          throw new Error("El archivo no tiene el formato de backup válido (faltan users, votes o results).");
+        }
+        restoreAllData(data);
+        setSuccess("Backup restaurado correctamente. Recargando...");
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (err) {
+        setError("Error al restaurar backup: " + err.message);
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div style={{ padding: "16px 0 100px" }}>
       <div className="leaderboard-header">
         <h2>⚙️ Panel Admin</h2>
-        <p>Captura los marcadores reales</p>
-        <button className="btn-logout" onClick={onClose} style={{ marginTop: 8 }}>
-          Cerrar Admin
+        <p>Captura los marcadores reales y exporta datos</p>
+        <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginTop: "8px", flexWrap: "wrap" }}>
+          <button className="btn-primary" onClick={handleExport} style={{ padding: "8px 16px", fontSize: "0.85rem", flex: 1, minWidth: "140px" }}>
+            📥 Exportar Backup (Recovery)
+          </button>
+          <button className="btn-logout" onClick={() => {
+            if (window.confirm("⚠️ ¿PELIGRO: Estás seguro de borrar a todos los usuarios, pronósticos y resultados?")) {
+              clearAllData();
+              window.location.reload();
+            }
+          }} style={{ padding: "8px 16px", borderColor: "var(--accent-red)", color: "var(--accent-red)", flex: 1, minWidth: "140px" }}>
+            🧨 Limpiar TODO
+          </button>
+          <button className="btn-logout" onClick={onClose} style={{ padding: "8px 16px", flex: 1, minWidth: "140px" }}>
+            Cerrar Admin
+          </button>
+        </div>
+      </div>
+
+      <div className="login-card" style={{ maxWidth: "100%", margin: "0 auto 24px", padding: "16px" }}>
+        <h3 style={{ fontSize: "1rem", marginBottom: "8px", textAlign: "left" }}>Cargar Partidos (JSON)</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: 16, textAlign: "left", lineHeight: "1.4" }}>
+          Sube un archivo JSON con los partidos. Opcionalmente usa el campo <code>"stage"</code> para la fase ("16avos", "8avos", "4tos", "semis", "final").
+        </p>
+
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+          <div className="form-group" style={{ flex: 1, minWidth: "200px" }}>
+            <label className="form-label" style={{ textAlign: "center", cursor: "pointer", display: "block", border: "2px dashed var(--border-glass)", padding: "16px", borderRadius: "var(--radius-md)", transition: "var(--transition-fast)" }}>
+              <span style={{ fontSize: "1.5rem", display: "block", marginBottom: 4 }}>📁</span>
+              <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>JSON Partidos</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleFileUpload}
+                style={{ display: "none" }}
+              />
+            </label>
+          </div>
+          <div className="form-group" style={{ flex: 1, minWidth: "200px" }}>
+            <label className="form-label" style={{ textAlign: "center", cursor: "pointer", display: "block", border: "2px dashed var(--border-glass)", padding: "16px", borderRadius: "var(--radius-md)", transition: "var(--transition-fast)" }}>
+              <span style={{ fontSize: "1.5rem", display: "block", marginBottom: 4 }}>📦</span>
+              <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>Restaurar Backup</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleBackupUpload}
+                style={{ display: "none" }}
+              />
+            </label>
+          </div>
+        </div>
+
+        {error && <div className="form-error" style={{ marginBottom: 12, color: "var(--accent-red)" }}>❌ {error}</div>}
+        {success && <div className="vote-saved-msg" style={{ marginBottom: 12, color: "var(--accent-green)" }}>✅ {success}</div>}
+
+        <button className="btn-logout" onClick={handleReset} style={{ width: "100%", borderColor: "var(--accent-red)", color: "var(--accent-red)", padding: "10px", marginTop: 8 }}>
+          Restablecer partidos predeterminados
         </button>
       </div>
+
+      <div className="login-card" style={{ maxWidth: "100%", margin: "0 auto 24px", padding: "16px" }}>
+        <h3 style={{ fontSize: "1rem", marginBottom: "8px", textAlign: "left" }}>Gestión de Usuarios</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: 16, textAlign: "left", lineHeight: "1.4" }}>
+          Elimina usuarios que hayan sido creados por error. Esto borrará también todos sus pronósticos.
+        </p>
+        <div style={{ maxHeight: "250px", overflowY: "auto", border: "1px solid var(--border-glass)", borderRadius: "var(--radius-md)", background: "var(--bg-glass)" }}>
+          {usersList.length === 0 ? (
+            <div style={{ padding: "16px", textAlign: "center", color: "var(--text-secondary)", fontSize: "0.85rem" }}>No hay usuarios registrados.</div>
+          ) : (
+            usersList.map((u) => (
+              <div key={u.username} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", borderBottom: "1px solid var(--border-glass)" }}>
+                <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>👤 {u.username}</span>
+                <button
+                  onClick={() => handleDeleteUser(u.username)}
+                  style={{ background: "transparent", border: "1px solid var(--accent-red)", color: "var(--accent-red)", padding: "4px 8px", borderRadius: "var(--radius-sm)", fontSize: "0.75rem", cursor: "pointer", transition: "var(--transition-fast)" }}
+                >
+                  🗑️ Eliminar
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
       <div className="matches-list">
         {matches.map((m) => (
           <div key={m.id} className="match-card" style={{ opacity: 1, animation: "none" }}>
@@ -439,6 +646,7 @@ export default function Home() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [matchesList, setMatchesList] = useState(MATCHES);
+  const [filterStage, setFilterStage] = useState("all");
 
   useEffect(() => {
     setMounted(true);
@@ -500,6 +708,9 @@ export default function Home() {
     else if (s === 1) { totalPoints += 1; totalOutcomes++; }
   });
 
+  const isTortas = user && user.toLowerCase() === "tortas";
+  const canShowAdmin = showAdmin && isTortas;
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -512,8 +723,8 @@ export default function Home() {
         </div>
       </header>
 
-      {showAdmin ? (
-        <AdminPanel matches={matchesList} onClose={() => setShowAdmin(false)} />
+      {canShowAdmin ? (
+        <AdminPanel matches={matchesList} onClose={() => setShowAdmin(false)} onMatchesUpdated={setMatchesList} />
       ) : (
         <>
           <nav className="tabs">
@@ -535,6 +746,29 @@ export default function Home() {
 
           {tab === "matches" && (
             <>
+              <div className="filter-stages" style={{ display: "flex", overflowX: "auto", gap: 8, padding: "8px 0", marginBottom: 16 }}>
+                {["all", "16avos", "8avos", "4tos", "semis", "final"].map(s => (
+                  <button 
+                    key={s}
+                    onClick={() => setFilterStage(s)}
+                    style={{ 
+                      padding: "6px 16px", 
+                      fontSize: "0.85rem", 
+                      fontWeight: 600,
+                      borderRadius: "20px", 
+                      whiteSpace: "nowrap", 
+                      cursor: "pointer",
+                      transition: "var(--transition-fast)",
+                      background: filterStage === s ? "var(--accent-cyan)" : "var(--bg-glass)", 
+                      color: filterStage === s ? "#000" : "var(--accent-cyan)", 
+                      border: `1px solid ${filterStage === s ? "transparent" : "var(--border-glass)"}`
+                    }}
+                  >
+                    {s === "all" ? "Todos" : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </button>
+                ))}
+              </div>
+
               <div className="my-score-badge">
                 <div className="score-item">
                   <div className="score-value">{Object.keys(votes).length}</div>
@@ -558,7 +792,7 @@ export default function Home() {
               </div>
 
               <div className="matches-list">
-                {matchesList.map((match) => (
+                {matchesList.filter(m => filterStage === "all" || (m.stage || "16avos") === filterStage).map((match) => (
                   <MatchCard
                     key={match.id}
                     match={match}
@@ -568,10 +802,10 @@ export default function Home() {
                     onVote={handleVote}
                   />
                 ))}
-                {matchesList.length === 0 && (
+                {matchesList.filter(m => filterStage === "all" || (m.stage || "16avos") === filterStage).length === 0 && (
                   <div className="empty-state">
                     <div className="empty-icon">⚽</div>
-                    <p>No hay partidos cargados todavía.</p>
+                    <p>No hay partidos cargados para esta fase todavía.</p>
                   </div>
                 )}
               </div>

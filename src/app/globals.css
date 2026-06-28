@@ -563,6 +563,26 @@ body::before {
   cursor: not-allowed;
 }
 
+.score-btn.minus {
+  color: var(--accent-red);
+  border-color: rgba(255, 99, 132, 0.3);
+}
+
+.score-btn.minus:hover:not(:disabled) {
+  border-color: var(--accent-red);
+  background: rgba(255, 99, 132, 0.1);
+}
+
+.score-btn.plus {
+  color: var(--accent-green);
+  border-color: rgba(75, 192, 192, 0.3);
+}
+
+.score-btn.plus:hover:not(:disabled) {
+  border-color: var(--accent-green);
+  background: rgba(75, 192, 192, 0.1);
+}
+
 .score-display {
   font-size: 1.6rem;
   font-weight: 900;
