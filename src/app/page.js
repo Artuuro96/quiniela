@@ -307,12 +307,14 @@ function UsersView({ currentUser, matches, results }) {
 
   const isAdmin = currentUser && currentUser.toLowerCase() === "tortas";
 
+  // Calculate predictions for selected user (only finished matches with results)
   const userPredictions = [];
   if (selectedUser && selectedUserVotes && matches && results) {
     matches.forEach((m) => {
+      const result = results[String(m.id)];
+      if (!result) return;
       const vote = selectedUserVotes[String(m.id)] || null;
-      const result = results[String(m.id)] || null;
-      const pts = vote && result ? scoreVote(vote, result) : null;
+      const pts = vote ? scoreVote(vote, result) : 0;
       userPredictions.push({ match: m, vote, result, points: pts });
     });
   }
@@ -381,7 +383,7 @@ function UsersView({ currentUser, matches, results }) {
                     fontSize: "0.85rem",
                     color: "var(--text-secondary)"
                   }}>
-                    <span>Pronosticados: <strong>{userPredictions.filter(p => p.vote).length}/{matches.length}</strong></span>
+                    <span>Con resultado: <strong>{userPredictions.length}</strong></span>
                     <span>Puntos: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
                   </div>
 
@@ -496,15 +498,15 @@ function LeaderboardView({ currentUser, matches, results }) {
 
   const myRank = board.findIndex((b) => b.username === currentUser) + 1;
   const myData = board.find((b) => b.username === currentUser);
-  const isAdmin = currentUser && currentUser.toLowerCase() === "tortas";
 
-  // Calculate predictions for selected user
+  // Calculate predictions for selected user (only finished matches with results)
   const userPredictions = [];
   if (selectedUser && selectedUserVotes && matches && results) {
     matches.forEach((m) => {
+      const result = results[String(m.id)];
+      if (!result) return;
       const vote = selectedUserVotes[String(m.id)] || null;
-      const result = results[String(m.id)] || null;
-      const pts = vote && result ? scoreVote(vote, result) : null;
+      const pts = vote ? scoreVote(vote, result) : 0;
       userPredictions.push({ match: m, vote, result, points: pts });
     });
   }
@@ -513,7 +515,7 @@ function LeaderboardView({ currentUser, matches, results }) {
     <div className="leaderboard">
       <div className="leaderboard-header">
         <h2>🏅 Tabla de Posiciones</h2>
-        <p>Ranking general{isAdmin ? " · Toca a un participante para ver sus aciertos" : ""}</p>
+        <p>Ranking general · Toca a un participante para ver sus pronósticos</p>
       </div>
 
       {/* Scoring rules */}
@@ -555,8 +557,8 @@ function LeaderboardView({ currentUser, matches, results }) {
               <div
                 key={p.username}
                 className={`podium-item ${podiumCls[realIdx] || ""}`}
-                style={isAdmin ? { cursor: "pointer" } : {}}
-                onClick={isAdmin ? () => handleSelectUser(p.username) : undefined}
+                style={{ cursor: "pointer" }}
+                onClick={() => handleSelectUser(p.username)}
               >
                 <span className="podium-medal">{medals[realIdx] || ""}</span>
                 <span className="podium-name">{p.username}</span>
@@ -575,8 +577,8 @@ function LeaderboardView({ currentUser, matches, results }) {
           <div
             key={entry.username}
             className={`leaderboard-row${entry.username === currentUser ? " is-me" : ""}`}
-            style={{ animationDelay: `${i * 0.04}s`, cursor: isAdmin ? "pointer" : "default" }}
-            onClick={isAdmin ? () => handleSelectUser(entry.username) : undefined}
+            style={{ animationDelay: `${i * 0.04}s`, cursor: "pointer" }}
+            onClick={() => handleSelectUser(entry.username)}
           >
             <span className="leaderboard-rank">{i + 1}</span>
             <span className="leaderboard-name">
@@ -625,7 +627,7 @@ function LeaderboardView({ currentUser, matches, results }) {
                     fontSize: "0.85rem",
                     color: "var(--text-secondary)"
                   }}>
-                    <span>Pronosticados: <strong>{userPredictions.filter(p => p.vote).length}/{matches.length}</strong></span>
+                    <span>Con resultado: <strong>{userPredictions.length}</strong></span>
                     <span>Puntos: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
                   </div>
 
@@ -1335,7 +1337,7 @@ export default function Home() {
         </div>
       </header>
 
-      {canShowAdmin ? (
+      {canShowAdmin && (
         <AdminPanel
           matches={matchesList}
           onClose={async () => {
@@ -1345,106 +1347,104 @@ export default function Home() {
           }}
           onMatchesUpdated={setMatchesList}
         />
-      ) : (
+      )}
+
+      <nav className="tabs">
+        <button
+          id="tab-matches"
+          className={`tab-btn${tab === "matches" ? " active" : ""}`}
+          onClick={() => setTab("matches")}
+        >
+          ⚽ Partidos
+        </button>
+        <button
+          id="tab-leaderboard"
+          className={`tab-btn${tab === "leaderboard" ? " active" : ""}`}
+          onClick={() => setTab("leaderboard")}
+        >
+          🏅 Posiciones
+        </button>
+        {canShowAdmin && (
+          <button
+            id="tab-users"
+            className={`tab-btn${tab === "users" ? " active" : ""}`}
+            onClick={() => setTab("users")}
+          >
+            👥 Usuarios
+          </button>
+        )}
+      </nav>
+
+      {tab === "matches" && (
         <>
-          <nav className="tabs">
-            <button
-              id="tab-matches"
-              className={`tab-btn${tab === "matches" ? " active" : ""}`}
-              onClick={() => setTab("matches")}
-            >
-              ⚽ Partidos
-            </button>
-            <button
-              id="tab-leaderboard"
-              className={`tab-btn${tab === "leaderboard" ? " active" : ""}`}
-              onClick={() => setTab("leaderboard")}
-            >
-              🏅 Posiciones
-            </button>
-            {isTortas && (
-              <button
-                id="tab-users"
-                className={`tab-btn${tab === "users" ? " active" : ""}`}
-                onClick={() => setTab("users")}
+          <div className="filter-stages" style={{ display: "flex", overflowX: "auto", gap: 8, padding: "8px 0", marginBottom: 16 }}>
+            {["all", "16avos", "8avos", "4tos", "semis", "final"].map(s => (
+              <button 
+                key={s}
+                onClick={() => setFilterStage(s)}
+                style={{ 
+                  padding: "6px 16px", 
+                  fontSize: "0.85rem", 
+                  fontWeight: 600,
+                  borderRadius: "20px", 
+                  whiteSpace: "nowrap", 
+                  cursor: "pointer",
+                  transition: "var(--transition-fast)",
+                  background: filterStage === s ? "var(--accent-cyan)" : "var(--bg-glass)", 
+                  color: filterStage === s ? "#000" : "var(--accent-cyan)", 
+                  border: `1px solid ${filterStage === s ? "transparent" : "var(--border-glass)"}`
+                }}
               >
-                👥 Usuarios
+                {s === "all" ? "Todos" : s.charAt(0).toUpperCase() + s.slice(1)}
               </button>
+            ))}
+          </div>
+
+          <div className="my-score-badge">
+            <div className="score-item">
+              <div className="score-value">{Object.keys(votes).length}</div>
+              <div className="score-label">Votos</div>
+            </div>
+            <div className="score-divider" />
+            <div className="score-item">
+              <div className="score-value">{totalPoints}</div>
+              <div className="score-label">Puntos</div>
+            </div>
+            <div className="score-divider" />
+            <div className="score-item">
+              <div className="score-value">{totalExact}</div>
+              <div className="score-label">Exactos 🎯</div>
+            </div>
+            <div className="score-divider" />
+            <div className="score-item">
+              <div className="score-value">{matchesList.length}</div>
+              <div className="score-label">Partidos</div>
+            </div>
+          </div>
+
+          <div className="matches-list">
+            {matchesList.filter(m => filterStage === "all" || (m.stage || "16avos") === filterStage).map((match) => (
+              <MatchCard
+                key={match.id}
+                match={match}
+                vote={votes[String(match.id)]}
+                result={results[String(match.id)]}
+                locked={isLocked(match.date)}
+                onVote={handleVote}
+              />
+            ))}
+            {matchesList.filter(m => filterStage === "all" || (m.stage || "16avos") === filterStage).length === 0 && (
+              <div className="empty-state">
+                <div className="empty-icon">⚽</div>
+                <p>No hay partidos cargados para esta fase todavía.</p>
+              </div>
             )}
-          </nav>
-
-          {tab === "matches" && (
-            <>
-              <div className="filter-stages" style={{ display: "flex", overflowX: "auto", gap: 8, padding: "8px 0", marginBottom: 16 }}>
-                {["all", "16avos", "8avos", "4tos", "semis", "final"].map(s => (
-                  <button 
-                    key={s}
-                    onClick={() => setFilterStage(s)}
-                    style={{ 
-                      padding: "6px 16px", 
-                      fontSize: "0.85rem", 
-                      fontWeight: 600,
-                      borderRadius: "20px", 
-                      whiteSpace: "nowrap", 
-                      cursor: "pointer",
-                      transition: "var(--transition-fast)",
-                      background: filterStage === s ? "var(--accent-cyan)" : "var(--bg-glass)", 
-                      color: filterStage === s ? "#000" : "var(--accent-cyan)", 
-                      border: `1px solid ${filterStage === s ? "transparent" : "var(--border-glass)"}`
-                    }}
-                  >
-                    {s === "all" ? "Todos" : s.charAt(0).toUpperCase() + s.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              <div className="my-score-badge">
-                <div className="score-item">
-                  <div className="score-value">{Object.keys(votes).length}</div>
-                  <div className="score-label">Votos</div>
-                </div>
-                <div className="score-divider" />
-                <div className="score-item">
-                  <div className="score-value">{totalPoints}</div>
-                  <div className="score-label">Puntos</div>
-                </div>
-                <div className="score-divider" />
-                <div className="score-item">
-                  <div className="score-value">{totalExact}</div>
-                  <div className="score-label">Exactos 🎯</div>
-                </div>
-                <div className="score-divider" />
-                <div className="score-item">
-                  <div className="score-value">{matchesList.length}</div>
-                  <div className="score-label">Partidos</div>
-                </div>
-              </div>
-
-              <div className="matches-list">
-                {matchesList.filter(m => filterStage === "all" || (m.stage || "16avos") === filterStage).map((match) => (
-                  <MatchCard
-                    key={match.id}
-                    match={match}
-                    vote={votes[String(match.id)]}
-                    result={results[String(match.id)]}
-                    locked={isLocked(match.date)}
-                    onVote={handleVote}
-                  />
-                ))}
-                {matchesList.filter(m => filterStage === "all" || (m.stage || "16avos") === filterStage).length === 0 && (
-                  <div className="empty-state">
-                    <div className="empty-icon">⚽</div>
-                    <p>No hay partidos cargados para esta fase todavía.</p>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {tab === "leaderboard" && <LeaderboardView currentUser={user} matches={matchesList} results={results} />}
-          {tab === "users" && <UsersView currentUser={user} matches={matchesList} results={results} />}
+          </div>
         </>
       )}
+
+      {tab === "leaderboard" && <LeaderboardView currentUser={user} matches={matchesList} results={results} />}
+      {canShowAdmin && tab === "users" && <UsersView currentUser={user} matches={matchesList} results={results} />}
 
       <Toast msg={toast} />
     </div>
