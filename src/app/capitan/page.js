@@ -16,8 +16,11 @@ export default function CapitanPage() {
 
   useEffect(() => {
     setMounted(true);
-    const custom = getCustomMatches();
-    setMatchesCount(custom && Array.isArray(custom) ? custom.length : MATCHES.length);
+    async function loadData() {
+      const custom = await getCustomMatches();
+      setMatchesCount(custom && Array.isArray(custom) ? custom.length : MATCHES.length);
+    }
+    loadData();
   }, []);
 
   const handleFileUpload = (e) => {
@@ -27,10 +30,10 @@ export default function CapitanPage() {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const text = event.target.result;
-        validateAndSave(text);
+        await validateAndSave(text);
       } catch (err) {
         setError("Error al leer el archivo: " + err.message);
       }
@@ -38,7 +41,7 @@ export default function CapitanPage() {
     reader.readAsText(file);
   };
 
-  const validateAndSave = (text) => {
+  const validateAndSave = async (text) => {
     try {
       const parsed = JSON.parse(text);
       if (!Array.isArray(parsed)) {
@@ -61,7 +64,7 @@ export default function CapitanPage() {
         }
       });
 
-      saveCustomMatches(parsed);
+      await saveCustomMatches(parsed);
       setMatchesCount(parsed.length);
       setSuccess("¡Partidos cargados correctamente!");
     } catch (err) {
@@ -69,9 +72,9 @@ export default function CapitanPage() {
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (confirm("¿Estás seguro de que quieres restablecer los partidos predeterminados?")) {
-      clearCustomMatches();
+      await clearCustomMatches();
       setMatchesCount(MATCHES.length);
       setError("");
       setSuccess("¡Partidos restablecidos a los predeterminados!");
