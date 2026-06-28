@@ -266,6 +266,172 @@ function MatchCard({ match, vote, result, onVote, locked }) {
   );
 }
 
+// ─── Users View ───
+function UsersView({ currentUser, matches, results }) {
+  const [board, setBoard] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUserVotes, setSelectedUserVotes] = useState(null);
+  const [loadingVotes, setLoadingVotes] = useState(false);
+
+  useEffect(() => {
+    async function load() {
+      const b = await getLeaderboard();
+      setBoard(b || []);
+      setLoading(false);
+    }
+    load();
+
+    if (!supabase) return;
+    const channel = supabase
+      .channel('realtime-users')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quiniela_results' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quiniela_votes' }, load)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quiniela_users' }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser]);
+
+  const handleSelectUser = async (username) => {
+    setSelectedUser(username);
+    setLoadingVotes(true);
+    const votes = await getUserVotes(username);
+    setSelectedUserVotes(votes || {});
+    setLoadingVotes(false);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedUser(null);
+    setSelectedUserVotes(null);
+  };
+
+  const isAdmin = currentUser && currentUser.toLowerCase() === "tortas";
+
+  const userPredictions = [];
+  if (selectedUser && selectedUserVotes && matches && results) {
+    matches.forEach((m) => {
+      const vote = selectedUserVotes[String(m.id)] || null;
+      const result = results[String(m.id)] || null;
+      const pts = vote && result ? scoreVote(vote, result) : null;
+      userPredictions.push({ match: m, vote, result, points: pts });
+    });
+  }
+
+  if (loading) return <div style={{textAlign: "center", padding: "40px", color: "var(--accent-cyan)"}}>Cargando usuarios...</div>;
+
+  return (
+    <div className="leaderboard">
+      <div className="leaderboard-header">
+        <h2>👥 Todos los Usuarios</h2>
+        <p>{board.length} participante{board.length !== 1 ? "s" : ""}{isAdmin ? " · Toca a un usuario para ver sus pronósticos" : ""}</p>
+      </div>
+
+      <div className="leaderboard-list">
+        {board.map((entry, i) => (
+          <div
+            key={entry.username}
+            className={`leaderboard-row${entry.username === currentUser ? " is-me" : ""}`}
+            style={{ cursor: isAdmin ? "pointer" : "default" }}
+            onClick={isAdmin ? () => handleSelectUser(entry.username) : undefined}
+          >
+            <span className="leaderboard-rank">{i + 1}</span>
+            <span className="leaderboard-name">
+              {entry.username}
+              {entry.username === currentUser ? " (tú)" : ""}
+            </span>
+            <span className="leaderboard-stats">
+              <span className="stat-exact" title="Exactos">🎯{entry.exact}</span>
+              <span className="stat-outcomes" title="Resultados">✓{entry.outcomes}</span>
+            </span>
+            <span className="leaderboard-score">
+              {entry.points} <span>pts</span>
+            </span>
+          </div>
+        ))}
+        {board.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-icon">👥</div>
+            <p>Aún no hay participantes registrados</p>
+          </div>
+        )}
+      </div>
+
+      {/* Modal for displaying all predictions of selected user */}
+      {selectedUser && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">⚽ Pronósticos de {selectedUser}</div>
+              <button className="modal-close-btn" onClick={handleCloseModal}>&times;</button>
+            </div>
+            <div className="modal-body">
+              {loadingVotes ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "var(--accent-cyan)" }}>
+                  Cargando pronósticos...
+                </div>
+              ) : (
+                <>
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    background: "rgba(255,255,255,0.03)",
+                    borderRadius: "var(--radius-sm)",
+                    marginBottom: "16px",
+                    fontSize: "0.85rem",
+                    color: "var(--text-secondary)"
+                  }}>
+                    <span>Pronosticados: <strong>{userPredictions.filter(p => p.vote).length}/{matches.length}</strong></span>
+                    <span>Puntos: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {userPredictions.map(({ match, vote, result, points }) => (
+                      <div key={match.id} className={`prediction-item ${points !== null ? `pts-${points}` : ""}`}>
+                        <div className="prediction-match-info">
+                          <span style={{ textTransform: "capitalize", fontWeight: 600 }}>{match.stage || "16avos"}</span>
+                          {points !== null && points > 0 && (
+                            <span className={`points-badge pts-${points}`} style={{ margin: 0, padding: "2px 8px" }}>
+                              {points === 2 ? "🎯 +2 puntos" : "✓ +1 punto"}
+                            </span>
+                          )}
+                          {points === 0 && (
+                            <span className="points-badge pts-0" style={{ margin: 0, padding: "2px 8px" }}>
+                              ❌ +0 puntos
+                            </span>
+                          )}
+                        </div>
+                        <div className="prediction-teams">
+                          <span>{match.teamA.flag} {match.teamA.name}</span>
+                          <span style={{ color: "var(--text-muted)", margin: "0 8px" }}>vs</span>
+                          <span>{match.teamB.name} {match.teamB.flag}</span>
+                        </div>
+                        <div style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "0.8rem",
+                          borderTop: "1px solid rgba(255,255,255,0.05)",
+                          paddingTop: "6px",
+                          marginTop: "2px",
+                          color: "var(--text-secondary)"
+                        }}>
+                          <span>Resultado real: <strong>{result ? `${result.goalsA} - ${result.goalsB}` : "—"}</strong></span>
+                          <span>Su pronóstico: <strong>{vote ? `${vote.goalsA} - ${vote.goalsB}` : "Sin pronóstico"}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Leaderboard ───
 // ─── Leaderboard ───
 function LeaderboardView({ currentUser, matches, results }) {
@@ -1196,6 +1362,15 @@ export default function Home() {
             >
               🏅 Posiciones
             </button>
+            {isTortas && (
+              <button
+                id="tab-users"
+                className={`tab-btn${tab === "users" ? " active" : ""}`}
+                onClick={() => setTab("users")}
+              >
+                👥 Usuarios
+              </button>
+            )}
           </nav>
 
           {tab === "matches" && (
@@ -1267,6 +1442,7 @@ export default function Home() {
           )}
 
           {tab === "leaderboard" && <LeaderboardView currentUser={user} matches={matchesList} results={results} />}
+          {tab === "users" && <UsersView currentUser={user} matches={matchesList} results={results} />}
         </>
       )}
 
