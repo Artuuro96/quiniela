@@ -478,58 +478,15 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
     setLocalResults(res || {});
   };
 
-  const handleExport = async () => {
-    const data = {
-      users: await getUsers(),
-      votes: await getAllVotes(),
-      results: await getResults(),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "quiniela_data.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-  const handleBackupUpload = (e) => {
-    setError("");
-    setSuccess("");
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const text = event.target.result;
-        const data = JSON.parse(text);
-        if (!data.users || !data.votes || !data.results) {
-          throw new Error("El archivo no tiene el formato de backup válido (faltan users, votes o results).");
-        }
-        await restoreAllData(data);
-        setSuccess("Backup restaurado correctamente. Recargando...");
-        setTimeout(() => window.location.reload(), 1500);
-      } catch (err) {
-        setError("Error al restaurar backup: " + err.message);
-      }
-    };
-    reader.readAsText(file);
-  };
-
   return (
     <div style={{ padding: "16px 0 100px" }}>
       <div className="leaderboard-header">
         <h2>⚙️ Panel Admin</h2>
-        <p>Captura los marcadores reales y exporta datos</p>
+        <p>Captura los marcadores reales</p>
         <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginTop: "8px", flexWrap: "wrap" }}>
-          <button className="btn-primary" onClick={handleExport} style={{ padding: "8px 16px", fontSize: "0.85rem", flex: 1, minWidth: "140px" }}>
-            📥 Exportar Backup (Recovery)
-          </button>
-          <button className="btn-logout" onClick={() => {
+          <button className="btn-logout" onClick={async () => {
             if (window.confirm("⚠️ ¿PELIGRO: Estás seguro de borrar a todos los usuarios, pronósticos y resultados?")) {
-              clearAllData();
+              await clearAllData();
               window.location.reload();
             }
           }} style={{ padding: "8px 16px", borderColor: "var(--accent-red)", color: "var(--accent-red)", flex: 1, minWidth: "140px" }}>
@@ -547,31 +504,17 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
           Sube un archivo JSON con los partidos. Opcionalmente usa el campo <code>"stage"</code> para la fase ("16avos", "8avos", "4tos", "semis", "final").
         </p>
 
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-          <div className="form-group" style={{ flex: 1, minWidth: "200px" }}>
-            <label className="form-label" style={{ textAlign: "center", cursor: "pointer", display: "block", border: "2px dashed var(--border-glass)", padding: "16px", borderRadius: "var(--radius-md)", transition: "var(--transition-fast)" }}>
-              <span style={{ fontSize: "1.5rem", display: "block", marginBottom: 4 }}>📁</span>
-              <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>JSON Partidos</span>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleFileUpload}
-                style={{ display: "none" }}
-              />
-            </label>
-          </div>
-          <div className="form-group" style={{ flex: 1, minWidth: "200px" }}>
-            <label className="form-label" style={{ textAlign: "center", cursor: "pointer", display: "block", border: "2px dashed var(--border-glass)", padding: "16px", borderRadius: "var(--radius-md)", transition: "var(--transition-fast)" }}>
-              <span style={{ fontSize: "1.5rem", display: "block", marginBottom: 4 }}>📦</span>
-              <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>Restaurar Backup</span>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleBackupUpload}
-                style={{ display: "none" }}
-              />
-            </label>
-          </div>
+        <div className="form-group">
+          <label className="form-label" style={{ textAlign: "center", cursor: "pointer", display: "block", border: "2px dashed var(--border-glass)", padding: "16px", borderRadius: "var(--radius-md)", transition: "var(--transition-fast)" }}>
+            <span style={{ fontSize: "1.5rem", display: "block", marginBottom: 4 }}>📁</span>
+            <span style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>Seleccionar archivo JSON</span>
+            <input
+              type="file"
+              accept=".json"
+              onChange={handleFileUpload}
+              style={{ display: "none" }}
+            />
+          </label>
         </div>
 
         {error && <div className="form-error" style={{ marginBottom: 12, color: "var(--accent-red)" }}>❌ {error}</div>}
