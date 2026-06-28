@@ -68,6 +68,23 @@ export async function updateMatch(matchId, m) {
   if (error) throw new Error(error.message);
 }
 
+export async function addMatch(m) {
+  checkSupabase();
+  const { error } = await supabase.from('quiniela_matches').insert([{
+    id: m.id,
+    stage: m.stage || '16avos',
+    match_date: m.date,
+    venue: m.venue,
+    team_a_name: m.teamA.name,
+    team_a_flag: m.teamA.flag,
+    team_a_code: m.teamA.code,
+    team_b_name: m.teamB.name,
+    team_b_flag: m.teamB.flag,
+    team_b_code: m.teamB.code,
+  }]);
+  if (error) throw new Error(error.message);
+}
+
 // --- Usuarios ---
 export async function getUsers() {
   if (!supabase) return [];

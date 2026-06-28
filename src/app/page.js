@@ -24,6 +24,7 @@ import {
   saveCustomMatches,
   clearCustomMatches,
   updateMatch,
+  addMatch,
 } from "@/lib/storage";
 import { supabase } from "@/lib/supabase";
 
@@ -176,7 +177,7 @@ function MatchCard({ match, vote, result, onVote, locked }) {
 
   const pointsBadge = pts !== null && (
     <span className={`points-badge pts-${pts}`}>
-      {pts === 2 ? "🎯 +2 puntos" : pts === 1 ? "✓ +1 punto" : "✗ 0 puntos"}
+      {pts === 2 ? "🎯 +2 puntos" : pts === 1 ? "✓ +1 punto" : "+0 puntos"}
     </span>
   );
 
@@ -519,6 +520,68 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
 
   const [edits, setEdits] = useState({});
 
+  // Add Match Form State
+  const [newStage, setNewStage] = useState("8avos");
+  const [newTeamAName, setNewTeamAName] = useState("");
+  const [newTeamAFlag, setNewTeamAFlag] = useState("🏳️");
+  const [newTeamACode, setNewTeamACode] = useState("");
+  const [newTeamBName, setNewTeamBName] = useState("");
+  const [newTeamBFlag, setNewTeamBFlag] = useState("🏳️");
+  const [newTeamBCode, setNewTeamBCode] = useState("");
+  const [newDate, setNewDate] = useState("");
+  const [newVenue, setNewVenue] = useState("");
+
+  const handleCreateMatch = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!newTeamAName || !newTeamACode || !newTeamBName || !newTeamBCode) {
+      setError("Por favor completa los nombres y códigos de ambos equipos.");
+      return;
+    }
+
+    try {
+      const nextId = matches.length > 0 ? Math.max(...matches.map((m) => m.id)) + 1 : 1;
+      const matchObj = {
+        id: nextId,
+        stage: newStage,
+        date: newDate || new Date().toISOString(),
+        venue: newVenue || "Estadio por definir",
+        teamA: {
+          name: newTeamAName,
+          flag: newTeamAFlag || "🏳️",
+          code: newTeamACode.toUpperCase(),
+        },
+        teamB: {
+          name: newTeamBName,
+          flag: newTeamBFlag || "🏳️",
+          code: newTeamBCode.toUpperCase(),
+        }
+      };
+
+      await addMatch(matchObj);
+
+      const newList = [...matches, matchObj];
+      onMatchesUpdated(newList);
+      setSuccess("¡Partido añadido exitosamente!");
+
+      // Reset form
+      setNewTeamAName("");
+      setNewTeamACode("");
+      setNewTeamAFlag("🏳️");
+      setNewTeamBName("");
+      setNewTeamBCode("");
+      setNewTeamBFlag("🏳️");
+      setNewDate("");
+      setNewVenue("");
+
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError("Error al añadir partido: " + err.message);
+    }
+  };
+
   const getEditValue = (matchId, field, fallback) => {
     if (edits[matchId] && edits[matchId][field] !== undefined) {
       return edits[matchId][field];
@@ -713,6 +776,130 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
         <button className="btn-logout" onClick={handleReset} style={{ width: "100%", borderColor: "var(--accent-red)", color: "var(--accent-red)", padding: "10px", marginTop: 8 }}>
           Restablecer partidos predeterminados
         </button>
+      </div>
+
+      <div className="login-card" style={{ maxWidth: "100%", margin: "0 auto 24px", padding: "16px" }}>
+        <h3 style={{ fontSize: "1rem", marginBottom: "12px", textAlign: "left", color: "var(--accent-cyan)" }}>➕ Añadir Partido de Siguiente Fase</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: "0.85rem", marginBottom: 16, textAlign: "left", lineHeight: "1.4" }}>
+          Configura y añade un partido para las fases eliminatorias (Octavos, Cuartos, Semifinales, Final, etc.).
+        </p>
+
+        <form onSubmit={handleCreateMatch} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div className="form-group">
+            <label className="form-label" style={{ textAlign: "left" }}>Fase / Ronda</label>
+            <select
+              value={newStage}
+              onChange={(e) => setNewStage(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                background: "var(--bg-glass)",
+                border: "1px solid var(--border-glass)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--text-primary)",
+                outline: "none"
+              }}
+            >
+              <option value="16avos">16avos</option>
+              <option value="8avos">8avos (Octavos)</option>
+              <option value="4tos">4tos (Cuartos)</option>
+              <option value="semis">Semis (Semifinal)</option>
+              <option value="final">Final</option>
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div style={{ border: "1px solid rgba(255,255,255,0.05)", padding: "8px", borderRadius: "var(--radius-sm)" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent-cyan)", display: "block", marginBottom: "6px" }}>Equipo A</span>
+              <input
+                type="text"
+                placeholder="Nombre (ej: Brasil)"
+                value={newTeamAName}
+                onChange={(e) => setNewTeamAName(e.target.value)}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
+              />
+              <input
+                type="text"
+                placeholder="Código (ej: BRA)"
+                value={newTeamACode}
+                onChange={(e) => setNewTeamACode(e.target.value)}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
+              />
+              <input
+                type="text"
+                placeholder="Bandera Emoji (ej: 🇧🇷)"
+                value={newTeamAFlag}
+                onChange={(e) => setNewTeamAFlag(e.target.value)}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
+              />
+            </div>
+            <div style={{ border: "1px solid rgba(255,255,255,0.05)", padding: "8px", borderRadius: "var(--radius-sm)" }}>
+              <span style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--accent-cyan)", display: "block", marginBottom: "6px" }}>Equipo B</span>
+              <input
+                type="text"
+                placeholder="Nombre (ej: Francia)"
+                value={newTeamBName}
+                onChange={(e) => setNewTeamBName(e.target.value)}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
+              />
+              <input
+                type="text"
+                placeholder="Código (ej: FRA)"
+                value={newTeamBCode}
+                onChange={(e) => setNewTeamBCode(e.target.value)}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
+              />
+              <input
+                type="text"
+                placeholder="Bandera Emoji (ej: 🇫🇷)"
+                value={newTeamBFlag}
+                onChange={(e) => setNewTeamBFlag(e.target.value)}
+                style={{ width: "100%", padding: "8px", background: "rgba(0,0,0,0.2)", border: "1px solid var(--border-glass)", color: "var(--text-primary)", borderRadius: "4px", fontSize: "0.85rem", marginTop: "4px" }}
+              />
+            </div>
+          </div>
+
+          <div className="form-group" style={{ marginTop: "6px" }}>
+            <label className="form-label" style={{ textAlign: "left" }}>Fecha y Hora</label>
+            <input
+              type="datetime-local"
+              value={newDate}
+              onChange={(e) => setNewDate(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                background: "var(--bg-glass)",
+                border: "1px solid var(--border-glass)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--text-primary)",
+                outline: "none"
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" style={{ textAlign: "left" }}>Estadio / Sede</label>
+            <input
+              type="text"
+              placeholder="Estadio por definir"
+              value={newVenue}
+              onChange={(e) => setNewVenue(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                background: "var(--bg-glass)",
+                border: "1px solid var(--border-glass)",
+                borderRadius: "var(--radius-md)",
+                color: "var(--text-primary)",
+                outline: "none"
+              }}
+            />
+          </div>
+
+          <button type="submit" className="btn-primary" style={{ marginTop: "8px", padding: "12px", border: "none", borderRadius: "var(--radius-md)", fontWeight: 700, cursor: "pointer" }}>
+            ➕ Añadir Partido a la Base de Datos
+          </button>
+        </form>
       </div>
 
       <div className="login-card" style={{ maxWidth: "100%", margin: "0 auto 24px", padding: "16px" }}>
