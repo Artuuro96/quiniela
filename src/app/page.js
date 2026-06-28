@@ -307,14 +307,13 @@ function UsersView({ currentUser, matches, results }) {
 
   const isAdmin = currentUser && currentUser.toLowerCase() === "tortas";
 
-  // Calculate predictions for selected user (only finished matches with results)
+  // Admin sees ALL predictions, not just finished matches
   const userPredictions = [];
-  if (selectedUser && selectedUserVotes && matches && results) {
+  if (selectedUser && selectedUserVotes && matches) {
     matches.forEach((m) => {
-      const result = results[String(m.id)];
-      if (!result) return;
       const vote = selectedUserVotes[String(m.id)] || null;
-      const pts = vote ? scoreVote(vote, result) : 0;
+      const result = results[String(m.id)] || null;
+      const pts = vote && result ? scoreVote(vote, result) : null;
       userPredictions.push({ match: m, vote, result, points: pts });
     });
   }
@@ -383,7 +382,7 @@ function UsersView({ currentUser, matches, results }) {
                     fontSize: "0.85rem",
                     color: "var(--text-secondary)"
                   }}>
-                    <span>Con resultado: <strong>{userPredictions.length}</strong></span>
+                    <span>Pronosticados: <strong>{userPredictions.filter(p => p.vote).length}/{matches.length}</strong></span>
                     <span>Puntos: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
                   </div>
 
