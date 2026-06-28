@@ -1363,7 +1363,7 @@ export default function Home() {
         )}
       </nav>
 
-      {canShowAdmin && (
+      {canShowAdmin && tab === "matches" && (
         <AdminPanel
           matches={matchesList}
           onClose={async () => {
