@@ -1337,18 +1337,6 @@ export default function Home() {
         </div>
       </header>
 
-      {canShowAdmin && (
-        <AdminPanel
-          matches={matchesList}
-          onClose={async () => {
-            const res = await getResults();
-            if (res) setResults(res);
-            setShowAdmin(false);
-          }}
-          onMatchesUpdated={setMatchesList}
-        />
-      )}
-
       <nav className="tabs">
         <button
           id="tab-matches"
@@ -1374,6 +1362,18 @@ export default function Home() {
           </button>
         )}
       </nav>
+
+      {canShowAdmin && (
+        <AdminPanel
+          matches={matchesList}
+          onClose={async () => {
+            const res = await getResults();
+            if (res) setResults(res);
+            setShowAdmin(false);
+          }}
+          onMatchesUpdated={setMatchesList}
+        />
+      )}
 
       {tab === "matches" && (
         <>
