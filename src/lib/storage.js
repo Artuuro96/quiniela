@@ -43,24 +43,28 @@ export function getUsers() {
   return get(KEYS.USERS) || [];
 }
 
-export function registerUser(username, password) {
+export function registerUser(username) {
   const users = getUsers();
   if (users.find((u) => u.username.toLowerCase() === username.toLowerCase())) {
     return { ok: false, error: "Ese usuario ya existe" };
   }
-  users.push({ username, password });
+  users.push({ username });
   set(KEYS.USERS, users);
   return { ok: true };
 }
 
-export function loginUser(username, password) {
+export function loginUser(username) {
   const users = getUsers();
   const user = users.find(
     (u) => u.username.toLowerCase() === username.toLowerCase()
   );
-  if (!user) return { ok: false, error: "Usuario no encontrado" };
-  if (user.password !== password)
-    return { ok: false, error: "Contraseña incorrecta" };
+  if (!user) {
+    // Automatically register if not exists
+    users.push({ username });
+    set(KEYS.USERS, users);
+    set(KEYS.CURRENT_USER, username);
+    return { ok: true, username };
+  }
   set(KEYS.CURRENT_USER, user.username);
   return { ok: true, username: user.username };
 }

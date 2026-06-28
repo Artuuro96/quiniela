@@ -63,29 +63,19 @@ function Toast({ msg }) {
 
 // ─── Login Screen ───
 function LoginScreen({ onLogin }) {
-  const [isRegister, setIsRegister] = useState(false);
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError("");
     const u = username.trim();
-    const p = password.trim();
-    if (!u || !p) { setError("Llena todos los campos"); return; }
-    if (u.length < 3) { setError("Mínimo 3 caracteres en usuario"); return; }
+    if (!u) { setError("Por favor introduce tu nombre"); return; }
+    if (u.length < 3) { setError("El nombre debe tener al menos 3 letras"); return; }
 
-    if (isRegister) {
-      const res = registerUser(u, p);
-      if (!res.ok) { setError(res.error); return; }
-      const login = loginUser(u, p);
-      if (login.ok) onLogin(login.username);
-    } else {
-      const res = loginUser(u, p);
-      if (!res.ok) { setError(res.error); return; }
-      onLogin(res.username);
-    }
+    const res = loginUser(u);
+    if (!res.ok) { setError(res.error); return; }
+    onLogin(res.username);
   };
 
   return (
@@ -95,39 +85,21 @@ function LoginScreen({ onLogin }) {
       <p className="login-subtitle">Familia Jiménez · Mundial 2026</p>
       <form className="login-card" onSubmit={handleSubmit}>
         <div className="form-group">
-          <label className="form-label">Usuario</label>
+          <label className="form-label">Nombre</label>
           <input
             id="input-username"
             className="form-input"
             type="text"
-            placeholder="Tu nombre de usuario"
+            placeholder="Tu nombre completo o apodo"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            autoComplete="username"
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Contraseña</label>
-          <input
-            id="input-password"
-            className="form-input"
-            type="password"
-            placeholder="••••••"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete={isRegister ? "new-password" : "current-password"}
+            autoComplete="name"
           />
         </div>
         <div className="form-error">{error}</div>
-        <button id="btn-login" className="btn-primary" type="submit">
-          {isRegister ? "Crear cuenta" : "Entrar"}
+        <button id="btn-login" className="btn-primary" type="submit" style={{ marginTop: "8px" }}>
+          Entrar a la Quiniela
         </button>
-        <div className="login-toggle">
-          {isRegister ? "¿Ya tienes cuenta? " : "¿No tienes cuenta? "}
-          <button type="button" onClick={() => { setIsRegister(!isRegister); setError(""); }}>
-            {isRegister ? "Inicia sesión" : "Regístrate"}
-          </button>
-        </div>
       </form>
     </div>
   );
