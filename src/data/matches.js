@@ -1,133 +1,291 @@
-// World Cup 2026 — Round of 32 match data
+// World Cup 2026 — Match data (16avos + placeholders for 8avos, 4tos, semis, final)
 // All dates in UTC. Display in America/Mexico_City timezone.
-// Sources: FIFA.com, NBC Sports, Al Jazeera — verified June 28, 2026
 export const MATCHES = [
   {
     id: 1,
+    stage: "16avos",
     teamA: { name: "Sudáfrica", flag: "🇿🇦", code: "RSA" },
     teamB: { name: "Canadá", flag: "🇨🇦", code: "CAN" },
-    date: "2026-06-28T19:00:00Z", // 1:00 PM CDMX (12pm PT, 3pm ET)
+    date: "2026-06-28T19:00:00Z",
     venue: "Los Ángeles",
     result: null,
   },
   {
     id: 2,
+    stage: "16avos",
     teamA: { name: "Brasil", flag: "🇧🇷", code: "BRA" },
     teamB: { name: "Japón", flag: "🇯🇵", code: "JPN" },
-    date: "2026-06-29T18:00:00Z", // 12:00 PM CDMX (1pm ET)
+    date: "2026-06-29T18:00:00Z",
     venue: "Houston",
     result: null,
   },
   {
     id: 3,
+    stage: "16avos",
     teamA: { name: "Alemania", flag: "🇩🇪", code: "GER" },
     teamB: { name: "Paraguay", flag: "🇵🇾", code: "PAR" },
-    date: "2026-06-29T21:30:00Z", // 3:30 PM CDMX (4:30pm ET)
+    date: "2026-06-29T21:30:00Z",
     venue: "Boston",
     result: null,
   },
   {
     id: 4,
+    stage: "16avos",
     teamA: { name: "Países Bajos", flag: "🇳🇱", code: "NED" },
     teamB: { name: "Marruecos", flag: "🇲🇦", code: "MAR" },
-    date: "2026-06-30T02:00:00Z", // 8:00 PM CDMX Jun 29 (9pm ET)
+    date: "2026-06-30T02:00:00Z",
     venue: "Monterrey",
     result: null,
   },
   {
     id: 5,
+    stage: "16avos",
     teamA: { name: "C. de Marfil", flag: "🇨🇮", code: "CIV" },
     teamB: { name: "Noruega", flag: "🇳🇴", code: "NOR" },
-    date: "2026-06-30T18:00:00Z", // 12:00 PM CDMX (1pm ET)
+    date: "2026-06-30T18:00:00Z",
     venue: "Dallas",
     result: null,
   },
   {
     id: 6,
+    stage: "16avos",
     teamA: { name: "Francia", flag: "🇫🇷", code: "FRA" },
     teamB: { name: "Suecia", flag: "🇸🇪", code: "SWE" },
-    date: "2026-06-30T22:00:00Z", // 4:00 PM CDMX (5pm ET)
+    date: "2026-06-30T22:00:00Z",
     venue: "Nueva York",
     result: null,
   },
   {
     id: 7,
+    stage: "16avos",
     teamA: { name: "México", flag: "🇲🇽", code: "MEX" },
     teamB: { name: "Ecuador", flag: "🇪🇨", code: "ECU" },
-    date: "2026-07-01T02:00:00Z", // 8:00 PM CDMX Jun 30 (9pm ET)
+    date: "2026-07-01T02:00:00Z",
     venue: "Guadalajara",
     result: null,
   },
   {
     id: 8,
+    stage: "16avos",
     teamA: { name: "Inglaterra", flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", code: "ENG" },
     teamB: { name: "RD Congo", flag: "🇨🇩", code: "COD" },
-    date: "2026-07-01T17:00:00Z", // 11:00 AM CDMX (12pm ET)
+    date: "2026-07-01T17:00:00Z",
     venue: "Filadelfia",
     result: null,
   },
   {
     id: 9,
+    stage: "16avos",
     teamA: { name: "Bélgica", flag: "🇧🇪", code: "BEL" },
     teamB: { name: "Senegal", flag: "🇸🇳", code: "SEN" },
-    date: "2026-07-01T21:00:00Z", // 3:00 PM CDMX (4pm ET)
+    date: "2026-07-01T21:00:00Z",
     venue: "Houston",
     result: null,
   },
   {
     id: 10,
+    stage: "16avos",
     teamA: { name: "Estados Unidos", flag: "🇺🇸", code: "USA" },
     teamB: { name: "Bosnia", flag: "🇧🇦", code: "BIH" },
-    date: "2026-07-02T01:00:00Z", // 7:00 PM CDMX Jul 1 (8pm ET)
+    date: "2026-07-02T01:00:00Z",
     venue: "Santa Clara",
     result: null,
   },
   {
     id: 11,
+    stage: "16avos",
     teamA: { name: "España", flag: "🇪🇸", code: "ESP" },
     teamB: { name: "Austria", flag: "🇦🇹", code: "AUT" },
-    date: "2026-07-02T20:00:00Z", // 2:00 PM CDMX (3pm ET)
+    date: "2026-07-02T20:00:00Z",
     venue: "Miami",
     result: null,
   },
   {
     id: 12,
+    stage: "16avos",
     teamA: { name: "Portugal", flag: "🇵🇹", code: "POR" },
     teamB: { name: "Croacia", flag: "🇭🇷", code: "CRO" },
-    date: "2026-07-03T00:00:00Z", // 6:00 PM CDMX Jul 2 (7pm ET)
+    date: "2026-07-03T00:00:00Z",
     venue: "Atlanta",
     result: null,
   },
   {
     id: 13,
+    stage: "16avos",
     teamA: { name: "Suiza", flag: "🇨🇭", code: "SUI" },
     teamB: { name: "Argelia", flag: "🇩🇿", code: "ALG" },
-    date: "2026-07-03T04:00:00Z", // 10:00 PM CDMX Jul 2 (11pm ET)
+    date: "2026-07-03T04:00:00Z",
     venue: "Seattle",
     result: null,
   },
   {
     id: 14,
+    stage: "16avos",
     teamA: { name: "Australia", flag: "🇦🇺", code: "AUS" },
     teamB: { name: "Egipto", flag: "🇪🇬", code: "EGY" },
-    date: "2026-07-03T19:00:00Z", // 1:00 PM CDMX (2pm ET)
+    date: "2026-07-03T19:00:00Z",
     venue: "Dallas",
     result: null,
   },
   {
     id: 15,
+    stage: "16avos",
     teamA: { name: "Argentina", flag: "🇦🇷", code: "ARG" },
     teamB: { name: "Cabo Verde", flag: "🇨🇻", code: "CPV" },
-    date: "2026-07-03T23:00:00Z", // 5:00 PM CDMX (6pm ET)
+    date: "2026-07-03T23:00:00Z",
     venue: "Miami",
     result: null,
   },
   {
     id: 16,
+    stage: "16avos",
     teamA: { name: "Colombia", flag: "🇨🇴", code: "COL" },
     teamB: { name: "Ghana", flag: "🇬🇭", code: "GHA" },
-    date: "2026-07-04T01:30:00Z", // 7:30 PM CDMX Jul 3 (8:30pm ET)
+    date: "2026-07-04T01:30:00Z",
     venue: "Kansas City",
+    result: null,
+  },
+
+  // 8avos Placeholders
+  {
+    id: 17,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 1", flag: "🏳️", code: "G01" },
+    teamB: { name: "Ganador 16avos 2", flag: "🏳️", code: "G02" },
+    date: "2026-07-05T18:00:00Z",
+    venue: "Dallas",
+    result: null,
+  },
+  {
+    id: 18,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 3", flag: "🏳️", code: "G03" },
+    teamB: { name: "Ganador 16avos 4", flag: "🏳️", code: "G04" },
+    date: "2026-07-05T22:00:00Z",
+    venue: "Houston",
+    result: null,
+  },
+  {
+    id: 19,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 5", flag: "🏳️", code: "G05" },
+    teamB: { name: "Ganador 16avos 6", flag: "🏳️", code: "G06" },
+    date: "2026-07-06T18:00:00Z",
+    venue: "Nueva York",
+    result: null,
+  },
+  {
+    id: 20,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 7", flag: "🏳️", code: "G07" },
+    teamB: { name: "Ganador 16avos 8", flag: "🏳️", code: "G08" },
+    date: "2026-07-06T22:00:00Z",
+    venue: "Filadelfia",
+    result: null,
+  },
+  {
+    id: 21,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 9", flag: "🏳️", code: "G09" },
+    teamB: { name: "Ganador 16avos 10", flag: "🏳️", code: "G10" },
+    date: "2026-07-07T18:00:00Z",
+    venue: "Miami",
+    result: null,
+  },
+  {
+    id: 22,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 11", flag: "🏳️", code: "G11" },
+    teamB: { name: "Ganador 16avos 12", flag: "🏳️", code: "G12" },
+    date: "2026-07-07T22:00:00Z",
+    venue: "Atlanta",
+    result: null,
+  },
+  {
+    id: 23,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 13", flag: "🏳️", code: "G13" },
+    teamB: { name: "Ganador 16avos 14", flag: "🏳️", code: "G14" },
+    date: "2026-07-08T18:00:00Z",
+    venue: "Vancouver",
+    result: null,
+  },
+  {
+    id: 24,
+    stage: "8avos",
+    teamA: { name: "Ganador 16avos 15", flag: "🏳️", code: "G15" },
+    teamB: { name: "Ganador 16avos 16", flag: "🏳️", code: "G16" },
+    date: "2026-07-08T22:00:00Z",
+    venue: "Seattle",
+    result: null,
+  },
+
+  // 4tos Placeholders
+  {
+    id: 25,
+    stage: "4tos",
+    teamA: { name: "Ganador 8avos 17", flag: "🏳️", code: "G17" },
+    teamB: { name: "Ganador 8avos 18", flag: "🏳️", code: "G18" },
+    date: "2026-07-10T18:00:00Z",
+    venue: "Boston",
+    result: null,
+  },
+  {
+    id: 26,
+    stage: "4tos",
+    teamA: { name: "Ganador 8avos 19", flag: "🏳️", code: "G19" },
+    teamB: { name: "Ganador 8avos 20", flag: "🏳️", code: "G20" },
+    date: "2026-07-10T22:00:00Z",
+    venue: "Los Ángeles",
+    result: null,
+  },
+  {
+    id: 27,
+    stage: "4tos",
+    teamA: { name: "Ganador 8avos 21", flag: "🏳️", code: "G21" },
+    teamB: { name: "Ganador 8avos 22", flag: "🏳️", code: "G22" },
+    date: "2026-07-11T18:00:00Z",
+    venue: "Miami",
+    result: null,
+  },
+  {
+    id: 28,
+    stage: "4tos",
+    teamA: { name: "Ganador 8avos 23", flag: "🏳️", code: "G23" },
+    teamB: { name: "Ganador 8avos 24", flag: "🏳️", code: "G24" },
+    date: "2026-07-11T22:00:00Z",
+    venue: "Kansas City",
+    result: null,
+  },
+
+  // Semis Placeholders
+  {
+    id: 29,
+    stage: "semis",
+    teamA: { name: "Ganador 4tos 25", flag: "🏳️", code: "G25" },
+    teamB: { name: "Ganador 4tos 26", flag: "🏳️", code: "G26" },
+    date: "2026-07-14T22:00:00Z",
+    venue: "Dallas",
+    result: null,
+  },
+  {
+    id: 30,
+    stage: "semis",
+    teamA: { name: "Ganador 4tos 27", flag: "🏳️", code: "G27" },
+    teamB: { name: "Ganador 4tos 28", flag: "🏳️", code: "G28" },
+    date: "2026-07-15T22:00:00Z",
+    venue: "Atlanta",
+    result: null,
+  },
+
+  // Final Placeholder
+  {
+    id: 31,
+    stage: "final",
+    teamA: { name: "Ganador Semis 29", flag: "🏳️", code: "G29" },
+    teamB: { name: "Ganador Semis 30", flag: "🏳️", code: "G30" },
+    date: "2026-07-19T20:00:00Z",
+    venue: "Nueva York / Nueva Jersey",
     result: null,
   },
 ];

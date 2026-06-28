@@ -23,7 +23,9 @@ import {
   getCustomMatches,
   saveCustomMatches,
   clearCustomMatches,
+  updateMatch,
 } from "@/lib/storage";
+import { supabase } from "@/lib/supabase";
 
 // ─── Helpers ───
 const MX_TZ = "America/Mexico_City";
@@ -174,12 +176,19 @@ function MatchCard({ match, vote, result, onVote, locked }) {
 
   const pointsBadge = pts !== null && (
     <span className={`points-badge pts-${pts}`}>
-      {pts === 2 ? "🎯 +2 Exacto" : pts === 1 ? "✓ +1 Resultado" : "✗ 0 pts"}
+      {pts === 2 ? "🎯 +2 puntos" : pts === 1 ? "✓ +1 punto" : "✗ 0 puntos"}
     </span>
   );
 
+  let resultClass = "";
+  if (hasResult) {
+    if (pts === 2) resultClass = " card-exact-win";
+    else if (pts === 1) resultClass = " card-outcome-win";
+    else resultClass = " card-wrong-win";
+  }
+
   return (
-    <div className={`match-card${vote ? " has-vote" : ""}${locked ? " locked" : ""}`}>
+    <div className={`match-card${vote ? " has-vote" : ""}${locked ? " locked" : ""}${resultClass}`}>
       <div className="match-header">
         <span className="match-round" style={{ textTransform: "capitalize" }}>{match.stage || "16avos"}</span>
         <span className={`match-status ${status}`}>{statusLabel[status]}</span>
@@ -250,9 +259,13 @@ function MatchCard({ match, vote, result, onVote, locked }) {
 }
 
 // ─── Leaderboard ───
-function LeaderboardView({ currentUser }) {
+// ─── Leaderboard ───
+function LeaderboardView({ currentUser, matches, results }) {
   const [board, setBoard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedUserVotes, setSelectedUserVotes] = useState(null);
+  const [loadingVotes, setLoadingVotes] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -261,13 +274,44 @@ function LeaderboardView({ currentUser }) {
       setLoading(false);
     }
     load();
-  }, []);
+
+    if (!supabase) return;
+    const channel = supabase
+      .channel('realtime-leaderboard')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiniela_results' },
+        load
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiniela_votes' },
+        load
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser]);
+
+  const handleSelectUser = async (username) => {
+    setSelectedUser(username);
+    setLoadingVotes(true);
+    const votes = await getUserVotes(username);
+    setSelectedUserVotes(votes || {});
+    setLoadingVotes(false);
+  };
+
+  const handleCloseModal = () => {
+    setSelectedUser(null);
+    setSelectedUserVotes(null);
+  };
 
   if (loading) return <div style={{textAlign: "center", padding: "40px", color: "var(--accent-cyan)"}}>Cargando posiciones...</div>;
   const medals = ["🥇", "🥈", "🥉"];
   const podiumCls = ["first", "second", "third"];
   const top3 = board.slice(0, 3);
-  const rest = board.slice(3);
 
   const podiumOrder =
     top3.length >= 3
@@ -278,12 +322,33 @@ function LeaderboardView({ currentUser }) {
 
   const myRank = board.findIndex((b) => b.username === currentUser) + 1;
   const myData = board.find((b) => b.username === currentUser);
+  const isAdmin = currentUser && currentUser.toLowerCase() === "tortas";
+
+  // Calculate correct predictions for selected user
+  const correctPredictions = [];
+  if (selectedUser && selectedUserVotes && matches && results) {
+    matches.forEach((m) => {
+      const vote = selectedUserVotes[String(m.id)];
+      const result = results[String(m.id)];
+      if (vote && result) {
+        const pts = scoreVote(vote, result);
+        if (pts > 0) {
+          correctPredictions.push({
+            match: m,
+            vote,
+            result,
+            points: pts,
+          });
+        }
+      }
+    });
+  }
 
   return (
     <div className="leaderboard">
       <div className="leaderboard-header">
         <h2>🏅 Tabla de Posiciones</h2>
-        <p>Ranking general de la quiniela</p>
+        <p>Ranking general{isAdmin ? " · Toca a un participante para ver sus aciertos" : ""}</p>
       </div>
 
       {/* Scoring rules */}
@@ -322,7 +387,12 @@ function LeaderboardView({ currentUser }) {
           {podiumOrder.map((p) => {
             const realIdx = top3.indexOf(p);
             return (
-              <div key={p.username} className={`podium-item ${podiumCls[realIdx] || ""}`}>
+              <div
+                key={p.username}
+                className={`podium-item ${podiumCls[realIdx] || ""}`}
+                style={isAdmin ? { cursor: "pointer" } : {}}
+                onClick={isAdmin ? () => handleSelectUser(p.username) : undefined}
+              >
                 <span className="podium-medal">{medals[realIdx] || ""}</span>
                 <span className="podium-name">{p.username}</span>
                 <span className="podium-points">{p.points} pts</span>
@@ -340,7 +410,8 @@ function LeaderboardView({ currentUser }) {
           <div
             key={entry.username}
             className={`leaderboard-row${entry.username === currentUser ? " is-me" : ""}`}
-            style={{ animationDelay: `${i * 0.04}s` }}
+            style={{ animationDelay: `${i * 0.04}s`, cursor: isAdmin ? "pointer" : "default" }}
+            onClick={isAdmin ? () => handleSelectUser(entry.username) : undefined}
           >
             <span className="leaderboard-rank">{i + 1}</span>
             <span className="leaderboard-name">
@@ -363,17 +434,136 @@ function LeaderboardView({ currentUser }) {
           </div>
         )}
       </div>
+
+      {/* Modal for displaying correct predictions of selected user */}
+      {selectedUser && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">⚽ Aciertos de {selectedUser}</div>
+              <button className="modal-close-btn" onClick={handleCloseModal}>&times;</button>
+            </div>
+            <div className="modal-body">
+              {loadingVotes ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "var(--accent-cyan)" }}>
+                  Cargando pronósticos...
+                </div>
+              ) : (
+                <>
+                  <div style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    padding: "8px 12px",
+                    background: "rgba(255,255,255,0.03)",
+                    borderRadius: "var(--radius-sm)",
+                    marginBottom: "16px",
+                    fontSize: "0.85rem",
+                    color: "var(--text-secondary)"
+                  }}>
+                    <span>Aciertos: <strong>{correctPredictions.length}</strong></span>
+                    <span>Puntos totales: <strong>{board.find(b => b.username === selectedUser)?.points || 0} pts</strong></span>
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {correctPredictions.map(({ match, vote, result, points }) => (
+                      <div key={match.id} className={`prediction-item pts-${points}`}>
+                        <div className="prediction-match-info">
+                          <span style={{ textTransform: "capitalize", fontWeight: 600 }}>{match.stage || "16avos"}</span>
+                          <span className={`points-badge pts-${points}`} style={{ margin: 0, padding: "2px 8px" }}>
+                            {points === 2 ? "🎯 +2 puntos" : "✓ +1 punto"}
+                          </span>
+                        </div>
+                        <div className="prediction-teams">
+                          <span>{match.teamA.flag} {match.teamA.name}</span>
+                          <span style={{ color: "var(--text-muted)", margin: "0 8px" }}>vs</span>
+                          <span>{match.teamB.name} {match.teamB.flag}</span>
+                        </div>
+                        <div style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          fontSize: "0.8rem",
+                          borderTop: "1px solid rgba(255,255,255,0.05)",
+                          paddingTop: "6px",
+                          marginTop: "2px",
+                          color: "var(--text-secondary)"
+                        }}>
+                          <span>Resultado real: <strong>{result.goalsA} - {result.goalsB}</strong></span>
+                          <span>Su pronóstico: <strong>{vote.goalsA} - {vote.goalsB}</strong></span>
+                        </div>
+                      </div>
+                    ))}
+
+                    {correctPredictions.length === 0 && (
+                      <div style={{ textAlign: "center", padding: "30px", color: "var(--text-muted)" }}>
+                        📭 Este usuario aún no tiene ningún acierto registrado.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Admin Panel (activate with ?admin in URL) ───
 function AdminPanel({ matches, onClose, onMatchesUpdated }) {
   const [results, setLocalResults] = useState({});
   const [usersList, setUsersList] = useState([]);
   const [inputs, setInputs] = useState({});
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const [edits, setEdits] = useState({});
+
+  const getEditValue = (matchId, field, fallback) => {
+    if (edits[matchId] && edits[matchId][field] !== undefined) {
+      return edits[matchId][field];
+    }
+    return fallback;
+  };
+
+  const setEditValue = (matchId, field, value) => {
+    setEdits((prev) => ({
+      ...prev,
+      [matchId]: {
+        ...prev[matchId],
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleUpdateMatch = async (matchId, m) => {
+    try {
+      const updated = {
+        stage: m.stage || "16avos",
+        date: getEditValue(matchId, "date", m.date),
+        venue: getEditValue(matchId, "venue", m.venue),
+        teamA: {
+          name: getEditValue(matchId, "teamA_name", m.teamA.name),
+          flag: getEditValue(matchId, "teamA_flag", m.teamA.flag),
+          code: getEditValue(matchId, "teamA_code", m.teamA.code),
+        },
+        teamB: {
+          name: getEditValue(matchId, "teamB_name", m.teamB.name),
+          flag: getEditValue(matchId, "teamB_flag", m.teamB.flag),
+          code: getEditValue(matchId, "teamB_code", m.teamB.code),
+        }
+      };
+
+      await updateMatch(matchId, updated);
+
+      const newList = matches.map((item) => (item.id === matchId ? { ...item, ...updated } : item));
+      onMatchesUpdated(newList);
+      setSuccess("¡Datos del partido actualizados!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError("Error al actualizar partido: " + err.message);
+    }
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -595,6 +785,102 @@ function AdminPanel({ matches, onClose, onMatchesUpdated }) {
                 ✅ Resultado: {results[m.id].goalsA} - {results[m.id].goalsB}
               </div>
             )}
+
+            {/* Form to edit match details */}
+            <div style={{ borderTop: "1px dashed var(--border-glass)", paddingTop: 12, marginTop: 12 }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent-cyan)", marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>✏️ Editar Info Partido ({m.stage || "16avos"})</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 60px", gap: 8, marginBottom: 8 }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Flag A</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "teamA_flag", m.teamA.flag)}
+                    onChange={(e) => setEditValue(m.id, "teamA_flag", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Equipo A</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "teamA_name", m.teamA.name)}
+                    onChange={(e) => setEditValue(m.id, "teamA_name", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Cód A</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "teamA_code", m.teamA.code)}
+                    onChange={(e) => setEditValue(m.id, "teamA_code", e.target.value.toUpperCase())}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "70px 1fr 60px", gap: 8, marginBottom: 8 }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Flag B</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "teamB_flag", m.teamB.flag)}
+                    onChange={(e) => setEditValue(m.id, "teamB_flag", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Equipo B</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "teamB_name", m.teamB.name)}
+                    onChange={(e) => setEditValue(m.id, "teamB_name", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Cód B</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "teamB_code", m.teamB.code)}
+                    onChange={(e) => setEditValue(m.id, "teamB_code", e.target.value.toUpperCase())}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Fecha/Hora (UTC)</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    placeholder="YYYY-MM-DDTHH:MM:SSZ"
+                    value={getEditValue(m.id, "date", m.date)}
+                    onChange={(e) => setEditValue(m.id, "date", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label" style={{ fontSize: "0.65rem", marginBottom: 2 }}>Estadio</label>
+                  <input
+                    className="form-input"
+                    style={{ padding: "6px 8px", fontSize: "0.8rem" }}
+                    value={getEditValue(m.id, "venue", m.venue)}
+                    onChange={(e) => setEditValue(m.id, "venue", e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <button
+                className="btn-save-vote"
+                style={{ background: "var(--accent-violet)", width: "100%", maxWidth: "none", margin: 0 }}
+                onClick={() => handleUpdateMatch(m.id, m)}
+              >
+                💾 Guardar Datos del Partido
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -641,6 +927,46 @@ export default function Home() {
       setShowAdmin(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('realtime-global')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiniela_results' },
+        async () => {
+          const res = await getResults();
+          if (res) setResults(res);
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiniela_matches' },
+        async () => {
+          const custom = await getCustomMatches();
+          if (custom && Array.isArray(custom)) {
+            setMatchesList(custom);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiniela_votes' },
+        async () => {
+          if (user) {
+            const uVotes = await getUserVotes(user);
+            setVotes(uVotes);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const showToast = useCallback((text, type = "success") => {
     setToast({ text, type });
@@ -704,7 +1030,15 @@ export default function Home() {
       </header>
 
       {canShowAdmin ? (
-        <AdminPanel matches={matchesList} onClose={() => setShowAdmin(false)} onMatchesUpdated={setMatchesList} />
+        <AdminPanel
+          matches={matchesList}
+          onClose={async () => {
+            const res = await getResults();
+            if (res) setResults(res);
+            setShowAdmin(false);
+          }}
+          onMatchesUpdated={setMatchesList}
+        />
       ) : (
         <>
           <nav className="tabs">
@@ -792,7 +1126,7 @@ export default function Home() {
             </>
           )}
 
-          {tab === "leaderboard" && <LeaderboardView currentUser={user} />}
+          {tab === "leaderboard" && <LeaderboardView currentUser={user} matches={matchesList} results={results} />}
         </>
       )}
 

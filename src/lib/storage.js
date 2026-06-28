@@ -52,6 +52,22 @@ export async function clearCustomMatches() {
   await supabase.from('quiniela_matches').delete().neq('id', -1);
 }
 
+export async function updateMatch(matchId, m) {
+  checkSupabase();
+  const { error } = await supabase.from('quiniela_matches').update({
+    stage: m.stage,
+    match_date: m.date,
+    venue: m.venue,
+    team_a_name: m.teamA.name,
+    team_a_flag: m.teamA.flag,
+    team_a_code: m.teamA.code,
+    team_b_name: m.teamB.name,
+    team_b_flag: m.teamB.flag,
+    team_b_code: m.teamB.code,
+  }).eq('id', matchId);
+  if (error) throw new Error(error.message);
+}
+
 // --- Usuarios ---
 export async function getUsers() {
   if (!supabase) return [];
@@ -209,7 +225,8 @@ export async function restoreAllData(data) {
 }
 
 export function scoreVote(vote, realResult) {
-  if (!vote || !realResult) return null;
+  if (!realResult) return null;
+  if (!vote) return 0;
   if (vote.goalsA === realResult.goalsA && vote.goalsB === realResult.goalsB) return 2;
   const voteDiff = vote.goalsA - vote.goalsB;
   const realDiff = realResult.goalsA - realResult.goalsB;
