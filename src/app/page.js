@@ -75,7 +75,7 @@ function LoginScreen({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    const u = username.trim();
+    const u = username.trim().toLowerCase();
     if (!u) { setError("Por favor introduce tu nombre"); return; }
     if (u.length < 3) { setError("El nombre debe tener al menos 3 letras"); return; }
 
