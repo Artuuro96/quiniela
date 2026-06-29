@@ -111,7 +111,7 @@ function LoginScreen({ onLogin }) {
             id="input-username"
             className="form-input"
             type="text"
-            placeholder={isAdminRoute ? "Nombre del administrador (tortas)" : "Tu nombre completo o apodo"}
+            placeholder={isAdminRoute ? "Nombre del administrador (tortas)" : "Nombre o apodo"}
             value={username}
             onChange={(e) => setUsername(e.target.value.toLowerCase())}
             autoComplete="name"
